@@ -1,0 +1,298 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { createSessionId, getTodayPlanDay, type ExercisePlan } from "@/lib/workout";
+import { useWorkoutSession } from "@/context/workout-session-context";
+
+type PlanResponse = {
+  planDay: string;
+  availableDays: string[];
+  planRows: ExercisePlan[];
+  error?: string;
+};
+
+type ExerciseSelection = {
+  include: boolean;
+  sets: string;
+};
+
+export default function Home() {
+  const { data: session } = useSession();
+  const { state, setState, updateState } = useWorkoutSession();
+  const router = useRouter();
+
+  const [selectedDay, setSelectedDay] = useState(getTodayPlanDay());
+  const [planRows, setPlanRows] = useState<ExercisePlan[]>([]);
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [selections, setSelections] = useState<ExerciseSelection[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) {
+      setPlanRows([]);
+      setAvailableDays([]);
+      setSelections([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(
+          `/api/sheets/plan?planDay=${encodeURIComponent(selectedDay)}`,
+          { signal: controller.signal }
+        );
+
+        let data: PlanResponse;
+        try {
+          data = (await response.json()) as PlanResponse;
+        } catch {
+          throw new Error("Plan API returned invalid JSON.");
+        }
+
+        if (!response.ok) {
+          throw new Error(data?.error || `Failed to load plan (${response.status})`);
+        }
+
+        if (cancelled) return;
+
+        setPlanRows(data.planRows ?? []);
+        setAvailableDays(data.availableDays ?? []);
+      } catch (e: any) {
+        if (e?.name === "AbortError") return;
+        if (cancelled) return;
+
+        setError(e?.message || "Failed to load plan.");
+        setPlanRows([]);
+        setAvailableDays([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [session, selectedDay]);
+
+  useEffect(() => {
+    setSelections(
+      planRows.map((row) => ({
+        include: true,
+        sets: Number.isFinite(row.sets) ? String(row.sets) : "0",
+      }))
+    );
+  }, [planRows]);
+
+  const dayOptions = useMemo(() => {
+    const unique = new Set(availableDays);
+    if (selectedDay) unique.add(selectedDay);
+    return Array.from(unique);
+  }, [availableDays, selectedDay]);
+
+  const plannedExercises = useMemo(() => {
+    return planRows.reduce((count, row, index) => {
+      const selection = selections[index];
+      const sets = Number(selection?.sets ?? row.sets);
+      if (!selection?.include) return count;
+      if (!Number.isFinite(sets) || sets <= 0) return count;
+      return count + 1;
+    }, 0);
+  }, [planRows, selections]);
+
+  const handleStart = () => {
+    const plan = planRows
+      .map((row, index) => {
+        const selection = selections[index];
+        const sets = Number(selection?.sets ?? row.sets);
+        if (!selection?.include || !Number.isFinite(sets) || sets <= 0) {
+          return null;
+        }
+        return {
+          ...row,
+          sets,
+        };
+      })
+      .filter((row): row is ExercisePlan => Boolean(row));
+
+    if (!plan.length) return;
+
+    const nextState = {
+      sessionId: createSessionId(),
+      planDay: selectedDay,
+      startTimestamp: new Date().toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      exercisesPlanned: plan.length,
+      exercisesCompleted: 0,
+      totalSetsLogged: 0,
+      plan,
+      currentExerciseIndex: 0,
+      currentSetIndex: 1,
+      sets: [],
+      exerciseNotes: {},
+      notes: "",
+    };
+
+    if (state) {
+      updateState(() => nextState);
+    } else {
+      setState(nextState);
+    }
+
+    router.push("/workout/plan");
+  };
+
+  return (
+    <main className="page">
+      <header className="page__header">
+        <span className="eyebrow">Workout Setup</span>
+        <h1 className="title">Plan today&apos;s session.</h1>
+        <p className="subtitle">Pick your plan day and tweak sets before you start.</p>
+      </header>
+
+      {!session && (
+        <section className="card stack fade-in">
+          <p className="muted">Sign in with Google to load your plan and sync results.</p>
+          <div className="row">
+            <button className="button button--accent" onClick={() => signIn("google")}>
+              Sign in with Google
+            </button>
+          </div>
+        </section>
+      )}
+
+      {session && (
+        <section className="stack">
+          <section className="card stack">
+            <div className="row spaced">
+              <div>
+                <p className="muted">Signed in as</p>
+                <strong>{session.user?.email}</strong>
+              </div>
+              <button className="button button--ghost" onClick={() => signOut()}>
+                Sign out
+              </button>
+            </div>
+            <div className="stack">
+              <label className="muted">Plan day</label>
+              <select
+                className="input"
+                value={selectedDay}
+                onChange={(event) => setSelectedDay(event.target.value)}
+              >
+                {dayOptions.map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          {error && (
+            <section className="card stack">
+              <p>
+                <strong>Error:</strong> {error}
+              </p>
+              <p className="muted">
+                If you have not created your Google Sheet yet, create it (tabs:
+                WorkoutPlan, WorkoutSessions, WorkoutSets), set SPREADSHEET_ID in
+                .env.local, then restart the dev server.
+              </p>
+            </section>
+          )}
+
+          {loading && (
+            <section className="card">
+              <p className="muted">Loading plan from Sheets...</p>
+            </section>
+          )}
+
+          {!loading && planRows.length === 0 && (
+            <section className="card">
+              <p className="muted">No exercises found for {selectedDay}.</p>
+            </section>
+          )}
+
+          {!loading && planRows.length > 0 && (
+            <section className="stack">
+              {planRows.map((exercise, index) => {
+                const selection = selections[index];
+                return (
+                  <div className="card stack fade-in" key={`${exercise.exercise_id}-${index}`}>
+                    <div className="row spaced">
+                      <div>
+                        <h3>{exercise.exercise_name}</h3>
+                        <p className="muted">
+                          {exercise.sets} sets • {exercise.target_rep_min}-
+                          {exercise.target_rep_max} reps
+                        </p>
+                      </div>
+                      <span className="tag">#{exercise.exercise_order}</span>
+                    </div>
+                    <div className="row spaced">
+                      <label className="row">
+                        <input
+                          type="checkbox"
+                          checked={selection?.include ?? true}
+                          onChange={(event) => {
+                            setSelections((prev) =>
+                              prev.map((item, idx) =>
+                                idx === index
+                                  ? { ...item, include: event.target.checked }
+                                  : item
+                              )
+                            );
+                          }}
+                        />
+                        <span>Include</span>
+                      </label>
+                      <div>
+                        <label className="muted">Sets</label>
+                        <input
+                          className="input input--inline"
+                          type="number"
+                          min={0}
+                          value={selection?.sets ?? String(exercise.sets)}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setSelections((prev) =>
+                              prev.map((item, idx) =>
+                                idx === index ? { ...item, sets: value } : item
+                              )
+                            );
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
+          <section className="card">
+            <button
+              className="button button--accent"
+              onClick={handleStart}
+              disabled={loading || plannedExercises === 0}
+            >
+              Start Workout
+            </button>
+          </section>
+        </section>
+      )}
+    </main>
+  );
+}
