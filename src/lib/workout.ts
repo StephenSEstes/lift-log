@@ -1,16 +1,28 @@
 export type ExercisePlan = {
-  plan_day: string;
-  exercise_order: number;
+  userEmail: string;
+  dayKey: string;
+  sortOrder: number;
   exercise_id: string;
   exercise_name: string;
-  sets: number;
+  plannedSets: number;
+  defaultRestSeconds?: number;
   target_rep_min: number;
   target_rep_max: number;
   youtube_url: string;
 };
 
+export type ExerciseCatalogRow = {
+  exerciseKey: string;
+  exerciseName: string;
+  videoUrl: string;
+  defaultRequiresWeight?: boolean;
+  defaultRestSeconds?: number;
+  isActive?: boolean;
+};
+
 export type LoggedSet = {
   session_id: string;
+  set_id?: string;
   set_timestamp: string;
   exercise_id: string;
   exercise_name: string;
@@ -20,8 +32,11 @@ export type LoggedSet = {
   reps: string;
   is_skipped: string;
   skip_reason: string;
-  rpe: string;
+  rpe?: string | number;
+  rest_seconds: string;
+  rest_target_seconds: string;
   notes: string;
+  is_deleted?: string;
 };
 
 export type WorkoutSessionState = {
@@ -33,6 +48,7 @@ export type WorkoutSessionState = {
   exercisesPlanned: number;
   exercisesCompleted: number;
   totalSetsLogged: number;
+  defaultRestSeconds: number;
   plan: ExercisePlan[];
   currentExerciseIndex: number;
   currentSetIndex: number;
@@ -68,6 +84,7 @@ export const createNewSession = (planDay: string): WorkoutSessionState => ({
   exercisesPlanned: 0,
   exercisesCompleted: 0,
   totalSetsLogged: 0,
+  defaultRestSeconds: 90,
   plan: [],
   currentExerciseIndex: 0,
   currentSetIndex: 1,

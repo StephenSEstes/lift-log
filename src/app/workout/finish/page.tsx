@@ -2,15 +2,29 @@
 
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useWorkoutSession } from "@/context/workout-session-context";
+
+type SyncStatus = "idle" | "syncing" | "success" | "error";
 
 export default function FinishPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const { state, clear, updateState } = useWorkoutSession();
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState("");
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [postSyncExerciseKey, setPostSyncExerciseKey] = useState("");
+  const [postSyncSessionId, setPostSyncSessionId] = useState("");
+
+  const progressHref = useMemo(() => {
+    if (!postSyncExerciseKey) return "";
+    const sessionQuery = postSyncSessionId
+      ? `&sessionId=${encodeURIComponent(postSyncSessionId)}`
+      : "";
+    return `/workout/progress?exerciseKey=${encodeURIComponent(
+      postSyncExerciseKey
+    )}${sessionQuery}`;
+  }, [postSyncExerciseKey, postSyncSessionId]);
 
   if (!state) {
     return (
@@ -26,8 +40,8 @@ export default function FinishPage() {
 
   const handleSync = async () => {
     if (!session) return;
-    setSyncing(true);
-    setError("");
+    setSyncStatus("syncing");
+    setSyncError(null);
     updateState((prev) => ({ ...prev, endTimestamp }));
 
     const payload = {
@@ -40,6 +54,7 @@ export default function FinishPage() {
         exercises_planned: state.exercisesPlanned.toString(),
         exercises_completed: state.exercisesCompleted.toString(),
         total_sets_logged: state.totalSetsLogged.toString(),
+        default_rest_seconds: state.defaultRestSeconds.toString(),
         notes: state.notes,
         created_at: new Date().toISOString(),
       },
@@ -57,14 +72,53 @@ export default function FinishPage() {
       if (!response.ok) {
         throw new Error("Sync failed.");
       }
-      clear();
-      router.push("/");
-    } catch (err) {
-      setError("Could not sync to Google Sheets. Please try again.");
-    } finally {
-      setSyncing(false);
+      const lastLoggedExerciseKey =
+        state.sets[state.sets.length - 1]?.exercise_id ??
+        state.plan[state.plan.length - 1]?.exercise_id ??
+        "";
+      setPostSyncExerciseKey(lastLoggedExerciseKey);
+      setPostSyncSessionId(state.sessionId);
+      setSyncStatus("success");
+    } catch {
+      setSyncStatus("error");
+      setSyncError("Could not sync to Google Sheets. Please try again.");
     }
   };
+
+  if (syncStatus === "success") {
+    return (
+      <main className="page">
+        <header className="page__header">
+          <span className="eyebrow">Workout Complete</span>
+          <h1 className="title">Congrats on your workout</h1>
+          <p className="subtitle">Your workout has been synced.</p>
+        </header>
+
+        <section className="card stack">
+          <button
+            className="button button--accent"
+            onClick={() => {
+              clear();
+              router.push("/workout/plan");
+            }}
+          >
+            Back to workout plan
+          </button>
+          {progressHref && (
+            <button
+              className="button button--ghost"
+              onClick={() => {
+                clear();
+                router.push(progressHref);
+              }}
+            >
+              View progress
+            </button>
+          )}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="page">
@@ -92,7 +146,7 @@ export default function FinishPage() {
         <div className="row spaced">
           <span className="muted">Time</span>
           <strong>
-            {new Date(state.startTimestamp).toLocaleTimeString()} →{" "}
+            {new Date(state.startTimestamp).toLocaleTimeString()} to{" "}
             {new Date(endTimestamp).toLocaleTimeString()}
           </strong>
         </div>
@@ -111,23 +165,21 @@ export default function FinishPage() {
         />
       </section>
 
-      {error && (
+      {syncStatus === "error" && syncError && (
         <section className="card">
-          <p className="muted">{error}</p>
+          <p className="muted">{syncError}</p>
         </section>
       )}
 
       <section className="card">
-        {!session && (
-          <p className="muted">Sign in to sync your workout.</p>
-        )}
+        {!session && <p className="muted">Sign in to sync your workout.</p>}
         {session && (
           <button
             className="button button--accent"
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncStatus === "syncing"}
           >
-            {syncing ? "Syncing..." : "Finish & Sync"}
+            {syncStatus === "syncing" ? "Syncing..." : "Finish & Sync"}
           </button>
         )}
       </section>
