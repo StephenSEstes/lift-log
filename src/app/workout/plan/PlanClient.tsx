@@ -168,6 +168,11 @@ export default function WorkoutPlanPage() {
       .filter((row) => row.plannedSets > 0);
   }, [planRows]);
 
+  const activePlan = useMemo(() => {
+    if (state?.plan?.length) return state.plan;
+    return planForSelectedDay;
+  }, [planForSelectedDay, state?.plan]);
+
   const progressMap = useMemo(() => {
     const counts = new Map<string, number>();
     sessionSets.forEach((set) => {
@@ -176,17 +181,17 @@ export default function WorkoutPlanPage() {
       counts.set(set.exercise_id, (counts.get(set.exercise_id) ?? 0) + 1);
     });
 
-    return planForSelectedDay.reduce((map, exercise) => {
+    return activePlan.reduce((map, exercise) => {
       map.set(exercise.exercise_id, {
         loggedCount: counts.get(exercise.exercise_id) ?? 0,
         plannedCount: exercise.plannedSets ?? 0,
       });
       return map;
     }, new Map<string, { loggedCount: number; plannedCount: number }>());
-  }, [planForSelectedDay, sessionId, sessionSets]);
+  }, [activePlan, sessionId, sessionSets]);
 
   useEffect(() => {
-    if (!planForSelectedDay.length) {
+    if (!activePlan.length) {
       setRestTargets({});
       return;
     }
@@ -198,7 +203,7 @@ export default function WorkoutPlanPage() {
       setLoadingRestTargets(true);
       try {
         const entries = await Promise.all(
-          planForSelectedDay.map(async (exercise) => {
+          activePlan.map(async (exercise) => {
             try {
               const response = await fetch(
                 `/api/sheets/exercise-setup/get?exerciseKey=${encodeURIComponent(
@@ -239,10 +244,10 @@ export default function WorkoutPlanPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [planForSelectedDay]);
+  }, [activePlan]);
 
   useEffect(() => {
-    if (!planForSelectedDay.length) {
+    if (!activePlan.length) {
       setCatalogMap({});
       return;
     }
@@ -252,7 +257,7 @@ export default function WorkoutPlanPage() {
     (async () => {
       try {
         const entries = await Promise.all(
-          planForSelectedDay.map(async (exercise) => {
+          activePlan.map(async (exercise) => {
             try {
               const response = await fetch(
                 `/api/sheets/exercise-catalog/get?exerciseKey=${encodeURIComponent(
@@ -290,7 +295,7 @@ export default function WorkoutPlanPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [planForSelectedDay]);
+  }, [activePlan]);
 
   const dayOptions = useMemo(() => {
     const unique = new Set(availableDays);
@@ -298,7 +303,7 @@ export default function WorkoutPlanPage() {
     return Array.from(unique);
   }, [availableDays, selectedDay]);
 
-  const firstExercise = planForSelectedDay[0] ?? null;
+  const firstExercise = activePlan[0] ?? null;
   const hasSession = Boolean(state?.sessionId);
   const isSessionComplete = useMemo(() => {
     if (!state?.sessionId || !state.plan.length) return false;
@@ -396,11 +401,11 @@ export default function WorkoutPlanPage() {
         planDay: selectedDay,
         startTimestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        exercisesPlanned: planForSelectedDay.length,
+        exercisesPlanned: activePlan.length,
         exercisesCompleted: 0,
         totalSetsLogged: 0,
         defaultRestSeconds: restDefault,
-        plan: planForSelectedDay,
+        plan: activePlan,
         currentExerciseIndex: 0,
         currentSetIndex: 1,
         sets: [],
@@ -430,7 +435,7 @@ export default function WorkoutPlanPage() {
       <header className="page__header">
         <span className="eyebrow">Workout Summary</span>
         <h1 className="title">Begin Workout</h1>
-        <p className="subtitle">{planForSelectedDay.length} exercises planned</p>
+        <p className="subtitle">{activePlan.length} exercises planned</p>
       </header>
 
       {hasActiveSession && (
@@ -483,11 +488,15 @@ export default function WorkoutPlanPage() {
         </div>
         <div className="stack">
           {loading && <p className="muted">Loading plan...</p>}
-          {!loading && planForSelectedDay.length === 0 && (
-            <p className="muted">No exercises found for {selectedDay}.</p>
+          {!loading && activePlan.length === 0 && (
+            <p className="muted">
+              {state?.plan?.length === 0
+                ? "No exercises selected for this session."
+                : `No exercises found for ${selectedDay}.`}
+            </p>
           )}
           {!loading &&
-            planForSelectedDay.map((exercise) => {
+            activePlan.map((exercise) => {
               const restTarget = getRestTarget(exercise);
               const displayName =
                 catalogMap[exercise.exercise_id]?.exerciseName || exercise.exercise_name;
@@ -550,7 +559,7 @@ export default function WorkoutPlanPage() {
         <button
           className="button button--accent"
           onClick={handleBegin}
-          disabled={loading || !firstExercise}
+          disabled={loading || activePlan.length === 0 || !firstExercise}
         >
           {primaryCtaLabel}
         </button>
