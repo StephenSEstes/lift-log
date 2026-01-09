@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { appendExerciseNotes, appendSession, appendSets } from "@/lib/google-sheets";
+import {
+  appendExerciseNotes,
+  appendSession,
+  appendSets,
+  type WorkoutExerciseNoteRow,
+  type WorkoutSessionRow,
+  type WorkoutSetRow,
+} from "@/lib/google-sheets";
+import type { ExercisePlan } from "@/lib/workout";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -9,35 +17,85 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const workoutSession = body?.session;
-  const sets = Array.isArray(body?.sets) ? body.sets : [];
-  const plan = Array.isArray(body?.plan) ? body.plan : [];
+  const requiredEnv = [
+    "SPREADSHEET_ID",
+    "SHEET_WORKOUT_SESSIONS",
+    "SHEET_WORKOUT_SETS",
+    "SHEET_WORKOUT_EXERCISE_NOTES",
+  ];
+  const missing = requiredEnv.filter((key) => !process.env[key]);
+  if (missing.length) {
+    return NextResponse.json(
+      {
+        error: `Missing required env vars: ${missing.join(", ")}`,
+      },
+      { status: 500 }
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as
+    | {
+        workoutSession?: WorkoutSessionRow;
+        session?: WorkoutSessionRow;
+        sets?: unknown;
+        plan?: unknown;
+        exerciseNotes?: unknown;
+      }
+    | null;
+  const {
+    workoutSession: rawWorkoutSession,
+    session: rawSession,
+    sets: rawSets,
+    plan: rawPlan,
+    exerciseNotes: rawExerciseNotes,
+  } = body ?? {};
+  const workoutSession = rawWorkoutSession ?? rawSession ?? null;
+  const sets = Array.isArray(rawSets) ? (rawSets as WorkoutSetRow[]) : [];
+  const plan = Array.isArray(rawPlan) ? (rawPlan as ExercisePlan[]) : [];
   const exerciseNotes =
-    body?.exerciseNotes && typeof body.exerciseNotes === "object"
-      ? (body.exerciseNotes as Record<string, string>)
+    rawExerciseNotes && typeof rawExerciseNotes === "object"
+      ? (rawExerciseNotes as Record<string, string>)
       : {};
 
-  if (!workoutSession) {
-    return NextResponse.json({ error: "Missing session data" }, { status: 400 });
+  const hasStringField = (value: unknown) => typeof value === "string";
+  const isWorkoutSessionRow = (value: unknown): value is WorkoutSessionRow => {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as WorkoutSessionRow;
+    return (
+      hasStringField(candidate.session_id) &&
+      hasStringField(candidate.plan_day) &&
+      hasStringField(candidate.start_timestamp) &&
+      hasStringField(candidate.end_timestamp) &&
+      hasStringField(candidate.timezone) &&
+      hasStringField(candidate.exercises_planned) &&
+      hasStringField(candidate.exercises_completed) &&
+      hasStringField(candidate.total_sets_logged) &&
+      hasStringField(candidate.default_rest_seconds) &&
+      hasStringField(candidate.notes) &&
+      hasStringField(candidate.created_at)
+    );
+  };
+
+  if (!isWorkoutSessionRow(workoutSession)) {
+    return NextResponse.json({ error: "Invalid session data" }, { status: 400 });
   }
 
   await appendSession(session.accessToken, workoutSession);
   await appendSets(session.accessToken, sets);
   const noteRows = plan
-    .map((exercise: any) => {
+    .map((exercise) => {
       const notes = (exerciseNotes?.[exercise.exercise_id] ?? "").toString().trim();
       if (!notes) return null;
       return {
         session_id: workoutSession.session_id,
         exercise_id: exercise.exercise_id,
         exercise_name: exercise.exercise_name,
-        exercise_order: exercise.exercise_order,
+        exercise_order: exercise.sortOrder,
         notes,
         updated_at: new Date().toISOString(),
-      };
+      } satisfies WorkoutExerciseNoteRow;
     })
-    .filter(Boolean);
+    .filter((row): row is WorkoutExerciseNoteRow => Boolean(row));
 
   await appendExerciseNotes(session.accessToken, noteRows);
 

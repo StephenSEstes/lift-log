@@ -9,6 +9,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const requiredEnv = ["SPREADSHEET_ID", "SHEET_WORKOUT_SETS"];
+  const missing = requiredEnv.filter((key) => !process.env[key]);
+  if (missing.length) {
+    return NextResponse.json(
+      {
+        lastSessionDate: null,
+        sets: [],
+        error: `Missing required env vars: ${missing.join(", ")}`,
+      },
+      { status: 500 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const exerciseId = (searchParams.get("exerciseId") ?? "").toLowerCase();
   const exerciseName = (searchParams.get("exerciseName") ?? "").toLowerCase();

@@ -23,26 +23,30 @@ const WorkoutSessionContext = createContext<WorkoutSessionContextValue | null>(
 );
 
 const STORAGE_KEY = "workout-session";
+const ACTIVE_SESSION_KEY = "activeWorkoutSessionId";
 
 export const WorkoutSessionProvider = ({ children }: { children: ReactNode }) => {
-  const [state, setState] = useState<WorkoutSessionState | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setState(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+  const [state, setState] = useState<WorkoutSessionState | null>(() => {
+    if (typeof window === "undefined") return null;
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as WorkoutSessionState;
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
     }
-  }, []);
+  });
 
   useEffect(() => {
     if (state) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (state.sessionId) {
+        localStorage.setItem(ACTIVE_SESSION_KEY, state.sessionId);
+      }
     } else {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_SESSION_KEY);
     }
   }, [state]);
 

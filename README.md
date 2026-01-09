@@ -20,6 +20,8 @@ SPREADSHEET_ID=your-spreadsheet-id
 SHEET_WORKOUT_PLAN=WorkoutPlan
 SHEET_WORKOUT_SESSIONS=WorkoutSessions
 SHEET_WORKOUT_SETS=WorkoutSets
+SHEET_WORKOUT_EXERCISE_NOTES=WorkoutExerciseNotes
+SHEET_EXERCISE_SETUP=ExerciseSetup
 ```
 
 3) Run the dev server
@@ -63,7 +65,13 @@ session_id, plan_day, start_timestamp, end_timestamp, timezone, exercises_planne
 ### WorkoutSets
 
 ```
-session_id, set_timestamp, exercise_id, exercise_name, exercise_order, set_number, weight, reps, is_skipped, skip_reason, rpe, notes
+session_id, set_timestamp, exercise_id, exercise_name, exercise_order, set_number, weight, reps, is_skipped, skip_reason, rpe, rest_seconds, rest_target_seconds, notes
+```
+
+### WorkoutExerciseNotes
+
+```
+session_id, exercise_id, exercise_name, exercise_order, notes, updated_at
 ```
 
 Share the spreadsheet with the Google account you use to sign in.
