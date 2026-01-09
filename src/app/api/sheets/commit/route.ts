@@ -29,7 +29,6 @@ export async function POST(request: Request) {
       "SPREADSHEET_ID",
       "SHEET_WORKOUT_SESSIONS",
       "SHEET_WORKOUT_SETS",
-      "SHEET_WORKOUT_EXERCISE_NOTES",
     ];
     const missing = requiredEnv.filter((key) => !process.env[key]);
     if (missing.length) {
@@ -105,7 +104,16 @@ export async function POST(request: Request) {
       })
       .filter((row): row is WorkoutExerciseNoteRow => Boolean(row));
 
+ if (process.env.SHEET_WORKOUT_EXERCISE_NOTES) {
+  if (noteRows.length) {
     await appendExerciseNotes(session.accessToken, noteRows);
+  }
+} else {
+  console.info("[api/sheets/commit] notes tab not configured; skipping notes append", {
+    errorId,
+  });
+}
+
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
