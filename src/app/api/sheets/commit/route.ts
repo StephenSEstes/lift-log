@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -9,6 +7,8 @@ export async function POST(request: Request) {
   console.info("[api/sheets/commit] start", { errorId });
 
   try {
+    const { getServerSession } = await import("next-auth/next");
+    const { authOptions } = await import("@/lib/auth");
     const {
       appendExerciseNotes,
       appendSession,
