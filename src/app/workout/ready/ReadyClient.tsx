@@ -35,6 +35,9 @@ export default function ReadyClient() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [hasUserEdited, setHasUserEdited] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [cleaning, setCleaning] = useState(false);
 
   const exerciseKey = (searchParams.get("exerciseKey") ?? "").trim();
   const sessionId = (searchParams.get("sessionId") ?? "").trim();
@@ -213,6 +216,37 @@ export default function ReadyClient() {
     );
   };
 
+  const handleReturnToPlan = async (removeIncomplete: boolean) => {
+    if (!removeIncomplete) {
+      setShowReturnDialog(false);
+      router.push("/workout/plan");
+      return;
+    }
+    if (!resolvedSessionId) {
+      setCleanupError("Missing session. Please return to plan and try again.");
+      return;
+    }
+    setCleaning(true);
+    setCleanupError(null);
+    try {
+      const resp = await fetch("/api/sheets/sets/cleanup-incomplete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: resolvedSessionId }),
+      });
+      const payload = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        throw new Error(payload?.error || "Failed to remove incomplete sets.");
+      }
+      setShowReturnDialog(false);
+      router.push("/workout/plan");
+    } catch (err: unknown) {
+      setCleanupError(getErrorMessage(err, "Failed to remove incomplete sets."));
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   const handleSaveSetup = async () => {
     if (!exercise) return;
     const candidate = Number(defaultRestSeconds);
@@ -279,8 +313,8 @@ export default function ReadyClient() {
         >
           {showVideo ? "Hide Video" : "Show Video"}
         </button>
-        <button className="button button--ghost" onClick={() => router.push("/workout/plan")}>
-          Back to Setup
+        <button className="button button--ghost" onClick={() => setShowReturnDialog(true)}>
+          Back to Plan
         </button>
         {showVideo && (
           <div className="stack">
@@ -344,6 +378,37 @@ export default function ReadyClient() {
         </button>
         {saveMessage && <p className="muted">{saveMessage}</p>}
       </section>
+      {showReturnDialog && (
+        <dialog open className="card stack">
+          <h3>Return to plan?</h3>
+          <p className="muted">Choose how to handle incomplete sets.</p>
+          {cleanupError && <p className="muted">{cleanupError}</p>}
+          <div className="row">
+            <button
+              className="button button--accent"
+              onClick={() => handleReturnToPlan(false)}
+            >
+              Return to Plan (Keep Logs)
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => handleReturnToPlan(true)}
+              disabled={cleaning}
+            >
+              {cleaning ? "Removing..." : "Return to Plan (Remove Incomplete)"}
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => {
+                setCleanupError(null);
+                setShowReturnDialog(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </dialog>
+      )}
     </main>
   );
 }

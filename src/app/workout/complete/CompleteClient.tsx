@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 export default function CompleteClient() {
   const router = useRouter();
@@ -26,6 +27,12 @@ export default function CompleteClient() {
       <section className="card stack">
         <button className="button button--accent" onClick={() => router.push("/workout/plan")}>
           Back to workout plan
+        </button>
+        <button
+          className="button button--ghost"
+          onClick={() => signOut({ callbackUrl: "/" })}
+        >
+          Finish & Sign Out
         </button>
         {progressHref && (
           <button className="button button--ghost" onClick={() => router.push(progressHref)}>

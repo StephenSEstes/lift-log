@@ -45,7 +45,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 const normalizeRpe = (value: unknown) => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 7;
+  return Number.isFinite(parsed) ? parsed : 5;
 };
 
 export default function ExerciseExecutionPage() {
@@ -59,7 +59,7 @@ export default function ExerciseExecutionPage() {
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
   const [skipReason, setSkipReason] = useState("");
-  const [rpe, setRpe] = useState<number>(7);
+  const [rpe, setRpe] = useState<number>(5);
   const [isResting, setIsResting] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
   const [restTargetSeconds, setRestTargetSeconds] = useState(120);
@@ -369,7 +369,7 @@ export default function ExerciseExecutionPage() {
     setWeight("");
     setReps("");
     setSkipReason("");
-    setRpe(7);
+    setRpe(5);
   };
 
   const logSet = (isSkipped: boolean) => {
@@ -633,6 +633,7 @@ const handleSave = async () => {
     return match?.rpe?.toString() ?? "";
   }, [history]);
   const rpeDisplay = rpe.toFixed(1);
+  const nextSetNumber = sessionSets.length + 1;
   const targetHelper = useMemo(() => {
     if (!targetSetParam) return "";
     if (targetSetParam <= sessionSets.length) {
@@ -652,6 +653,11 @@ const handleSave = async () => {
   }
 
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
+  const videoUrl = catalogRow?.videoUrl || exercise.youtube_url?.trim();
+  const fallbackVideoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+    `${displayName} form`
+  )}`;
+  const resolvedVideoUrl = videoUrl || fallbackVideoUrl;
   const progressHref = `/workout/progress?exerciseKey=${encodeURIComponent(
     exercise.exercise_id
   )}`;
@@ -668,6 +674,14 @@ const handleSave = async () => {
         <button className="button button--ghost" onClick={() => router.push(backHref)}>
           Back to workout plan
         </button>
+        <a
+          className="button button--ghost"
+          href={resolvedVideoUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {videoUrl ? "Open Video" : "Search YouTube"}
+        </a>
         <button
           className="button button--ghost"
           onClick={() => router.push(progressHref)}
@@ -879,8 +893,10 @@ const handleSave = async () => {
                 disabled={!reps || (requiresWeight && !weight)}
               >
                 {editingSetId
-                  ? `Update Set ${editingSetNumber ?? ""}`.trim()
-                  : "Save Set"}
+                  ? editingSetNumber
+                    ? `Update Set ${editingSetNumber}`
+                    : "Update Selected Set"
+                  : `Save Set ${nextSetNumber}`}
               </button>
               <button className="button button--ghost" onClick={handleSkip}>
                 Skip Set
@@ -893,7 +909,7 @@ const handleSave = async () => {
                   setEditingSetId(null);
                   setEditingSetNumber(null);
                   setUpdateError(null);
-                  setRpe(7);
+                    setRpe(5);
                 }}
               >
                 Clear Selection

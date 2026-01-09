@@ -276,7 +276,7 @@ export default function Home() {
                   }}
                 />
                 <div className="row">
-                  {[60, 90, 120, 180].map((seconds) => (
+                  {[30, 60, 90, 120].map((seconds) => (
                     <button
                       key={seconds}
                       className="button button--ghost"
