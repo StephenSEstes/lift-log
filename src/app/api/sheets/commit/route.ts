@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const errorId = crypto.randomUUID();
-  console.info("[api/sheets/commit] start", { errorId });
-
+  let errorId = "unknown";
   try {
+    errorId = crypto.randomUUID();
+    console.info("[api/sheets/commit] start", { errorId });
+
     const { getServerSession } = await import("next-auth/next");
     const { authOptions } = await import("@/lib/auth");
     const {
