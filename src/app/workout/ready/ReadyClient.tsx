@@ -299,36 +299,10 @@ export default function ReadyClient() {
     <main className="page">
       <header className="page__header">
         <span className="eyebrow">Get Ready</span>
-        <h1 className="title">Get Ready</h1>
-        <p className="subtitle">{displayName}</p>
+        <h1 className="title">
+          <strong>Get ready for {displayName}</strong>
+        </h1>
       </header>
-
-      <section className="card stack">
-        <button className="button button--accent" onClick={handleBegin}>
-          Begin
-        </button>
-        <button
-          className="button button--ghost"
-          onClick={() => setShowVideo((prev) => !prev)}
-        >
-          {showVideo ? "Hide Video" : "Show Video"}
-        </button>
-        <button className="button button--ghost" onClick={() => setShowReturnDialog(true)}>
-          Back to Plan
-        </button>
-        {showVideo && (
-          <div className="stack">
-            <a
-              className="button button--ghost"
-              href={resolvedVideoUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {videoUrl ? "Open Video" : "Search YouTube"}
-            </a>
-          </div>
-        )}
-      </section>
 
       <section className="card stack">
         <h3>Setup</h3>
@@ -377,6 +351,33 @@ export default function ReadyClient() {
           {saving ? "Saving..." : "Save Setup"}
         </button>
         {saveMessage && <p className="muted">{saveMessage}</p>}
+      </section>
+
+      <section className="card stack">
+        <button className="button button--accent" onClick={handleBegin}>
+          Begin
+        </button>
+        <button
+          className="button button--ghost"
+          onClick={() => setShowVideo((prev) => !prev)}
+        >
+          {showVideo ? "Hide Video" : "Show Video"}
+        </button>
+        <button className="button button--ghost" onClick={() => setShowReturnDialog(true)}>
+          Back to Plan
+        </button>
+        {showVideo && (
+          <div className="stack">
+            <a
+              className="button button--ghost"
+              href={resolvedVideoUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {videoUrl ? "Open Video" : "Search YouTube"}
+            </a>
+          </div>
+        )}
       </section>
       {showReturnDialog && (
         <dialog open className="card stack">

@@ -675,12 +675,12 @@ const handleSave = async () => {
           Back to workout plan
         </button>
         <a
-          className="button button--ghost"
+          className="button button--ghost inline-flex items-center justify-center"
           href={resolvedVideoUrl}
           target="_blank"
           rel="noreferrer"
         >
-          {videoUrl ? "Open Video" : "Search YouTube"}
+          Video
         </a>
         <button
           className="button button--ghost"

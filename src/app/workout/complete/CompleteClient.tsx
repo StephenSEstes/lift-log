@@ -25,14 +25,14 @@ export default function CompleteClient() {
       </header>
 
       <section className="card stack">
-        <button className="button button--accent" onClick={() => router.push("/workout/plan")}>
-          Back to workout plan
-        </button>
         <button
-          className="button button--ghost"
+          className="button button--accent"
           onClick={() => signOut({ callbackUrl: "/" })}
         >
           Finish & Sign Out
+        </button>
+        <button className="button button--ghost" onClick={() => router.push("/workout/plan")}>
+          Back to workout plan
         </button>
         {progressHref && (
           <button className="button button--ghost" onClick={() => router.push(progressHref)}>
