@@ -682,14 +682,14 @@ export default function ExerciseExecutionPage() {
           Back to workout plan
         </button>
 
-        <a
-          className="button button--ghost !flex !w-full !items-center !justify-center !text-center"
-          href={resolvedVideoUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Video
-        </a>
+        <button
+          type="button"
+          className="button button--ghost w-full"
+           onClick={() => window.open(resolvedVideoUrl, "_blank", "noreferrer")}
+         >
+           Video
+         </button>
+
 
 
         <button className="button button--ghost" onClick={() => router.push(progressHref)}>
