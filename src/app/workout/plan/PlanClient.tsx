@@ -13,7 +13,6 @@ import { useWorkoutSession } from "@/context/workout-session-context";
 
 type PlanResponse = {
   planDay: string;
-  availableDays: string[];
   planRows: ExercisePlan[];
   error?: string;
 };
@@ -35,9 +34,8 @@ export default function WorkoutPlanPage() {
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
   const { state, setState } = useWorkoutSession();
-  const [selectedDay, setSelectedDay] = useState(() => state?.planDay ?? getTodayPlanDay());
+  const selectedDay = useMemo(() => state?.planDay ?? getTodayPlanDay(), [state?.planDay]);
   const [planRows, setPlanRows] = useState<ExercisePlan[]>([]);
-  const [availableDays, setAvailableDays] = useState<string[]>([]);
   const [restTargets, setRestTargets] = useState<RestTargetMap>({});
   const [catalogMap, setCatalogMap] = useState<CatalogMap>({});
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -98,13 +96,11 @@ export default function WorkoutPlanPage() {
 
         if (cancelled) return;
         setPlanRows(data.planRows ?? []);
-        setAvailableDays(data.availableDays ?? []);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
         if (cancelled) return;
         setError(getErrorMessage(err, "Failed to load plan."));
         setPlanRows([]);
-        setAvailableDays([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -297,12 +293,6 @@ export default function WorkoutPlanPage() {
     };
   }, [activePlan]);
 
-  const dayOptions = useMemo(() => {
-    const unique = new Set(availableDays);
-    if (selectedDay) unique.add(selectedDay);
-    return Array.from(unique);
-  }, [availableDays, selectedDay]);
-
   const firstExercise = activePlan[0] ?? null;
   const hasSession = Boolean(state?.sessionId);
   const isSessionComplete = useMemo(() => {
@@ -449,29 +439,15 @@ export default function WorkoutPlanPage() {
         </section>
       )}
 
-      <section className="card stack">
-        <div className="stack">
-          <label className="muted">Plan day</label>
-          <select
-            className="input"
-            value={selectedDay}
-            onChange={(event) => setSelectedDay(event.target.value)}
-          >
-            {dayOptions.map((day) => (
-              <option key={day} value={day}>
-                {day}
-              </option>
-            ))}
-          </select>
-        </div>
-        {error && (
+      {error && (
+        <section className="card stack">
           <div>
             <p>
               <strong>Error:</strong> {error}
             </p>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="card stack">
         <div className="grid muted" style={summaryGridStyle}>

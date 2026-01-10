@@ -127,6 +127,10 @@ export default function ExerciseExecutionPage() {
     return state.plan[state.currentExerciseIndex] ?? null;
   }, [state?.plan, state?.currentExerciseIndex, exerciseKeyParam]);
 
+  const resolvedExerciseKey = useMemo(() => {
+    return exerciseKeyParam || exercise?.exercise_id || "";
+  }, [exerciseKeyParam, exercise?.exercise_id]);
+
   // Reset "apply target set" guard when navigation params change
   useEffect(() => {
     appliedTargetRef.current = false;
@@ -240,24 +244,44 @@ export default function ExerciseExecutionPage() {
 
   // Load exercise setup (per user/exercise)
   useEffect(() => {
-    if (!exercise) return;
+    if (!resolvedExerciseKey) {
+      setExerciseSetup(null);
+      return;
+    }
 
-    const loadExerciseSetup = async () => {
-      const response = await fetch(
-        `/api/sheets/exercise-setup/get?exerciseKey=${encodeURIComponent(exercise.exercise_id)}`
-      );
-      const data = (await response.json().catch(() => null)) as
-        | { found?: boolean; row?: ExerciseSetupRow }
-        | null;
+    const controller = new AbortController();
+    let cancelled = false;
 
-      if (!response.ok) return;
+    setExerciseSetup(null);
 
-      if (data?.found && data.row) setExerciseSetup(data.row);
-      else setExerciseSetup(null);
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/sheets/exercise-setup/get?exerciseKey=${encodeURIComponent(
+            resolvedExerciseKey
+          )}`,
+          { signal: controller.signal }
+        );
+        const data = (await response.json().catch(() => null)) as
+          | { found?: boolean; row?: ExerciseSetupRow }
+          | null;
+
+        if (cancelled) return;
+        if (!response.ok) return;
+
+        if (data?.found && data.row) setExerciseSetup(data.row);
+        else setExerciseSetup(null);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (!cancelled) setExerciseSetup(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
     };
-
-    loadExerciseSetup();
-  }, [exercise]);
+  }, [resolvedExerciseKey]);
 
   // Load exercise catalog row (metadata like videoUrl, defaults, requiresWeight, etc.)
   useEffect(() => {
@@ -629,6 +653,19 @@ export default function ExerciseExecutionPage() {
     }
   };
 
+  const lastRpeValue = useMemo(() => {
+    if (!history?.sets?.length) return "";
+    const match = [...history.sets].reverse().find((set) => (set.rpe ?? "").toString().trim() !== "");
+    return match?.rpe?.toString() ?? "";
+  }, [history]);
+
+  const targetHelper = useMemo(() => {
+    if (!targetSetParam) return "";
+    if (targetSetParam <= sessionSets.length) return `Viewing: Set ${targetSetParam}`;
+    if (targetSetParam === sessionSets.length + 1) return `Next: Set ${targetSetParam}`;
+    return "";
+  }, [sessionSets.length, targetSetParam]);
+
   if (!exercise || !state) return null;
 
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
@@ -651,21 +688,8 @@ export default function ExerciseExecutionPage() {
       ? new Date(history.lastSessionDate).toLocaleDateString()
       : "";
 
-  const lastRpeValue = useMemo(() => {
-    if (!history?.sets?.length) return "";
-    const match = [...history.sets].reverse().find((set) => (set.rpe ?? "").toString().trim() !== "");
-    return match?.rpe?.toString() ?? "";
-  }, [history]);
-
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = sessionSets.length + 1;
-
-  const targetHelper = useMemo(() => {
-    if (!targetSetParam) return "";
-    if (targetSetParam <= sessionSets.length) return `Viewing: Set ${targetSetParam}`;
-    if (targetSetParam === sessionSets.length + 1) return `Next: Set ${targetSetParam}`;
-    return "";
-  }, [sessionSets.length, targetSetParam]);
 
   return (
     <main className="page">
