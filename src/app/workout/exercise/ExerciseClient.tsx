@@ -1004,7 +1004,7 @@ export default function ExerciseExecutionPage() {
                   ? editingSetNumber
                     ? `Update Set ${editingSetNumber}`
                     : "Update Selected Set"
-                  : `Save Set ${nextSetNumber}`}
+                  : `Save ${displayName || "Exercise"} Set ${nextSetNumber}`}
               </button>
 
               <button className="button button--ghost" onClick={handleSkip}>

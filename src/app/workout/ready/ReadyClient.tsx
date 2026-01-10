@@ -347,7 +347,7 @@ export default function ReadyClient() {
           />
           <span>Requires weight</span>
         </label>
-        <button className="button button--accent" onClick={handleSaveSetup} disabled={saving}>
+        <button className="button button--ghost" onClick={handleSaveSetup} disabled={saving}>
           {saving ? "Saving..." : "Save Setup"}
         </button>
         {saveMessage && <p className="muted">{saveMessage}</p>}
