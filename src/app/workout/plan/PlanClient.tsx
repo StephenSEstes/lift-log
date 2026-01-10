@@ -405,7 +405,7 @@ export default function WorkoutPlanPage() {
 
       setState(nextState);
       router.push(
-        `/workout/exercise?exerciseKey=${encodeURIComponent(
+        `/workout/ready?exerciseKey=${encodeURIComponent(
           firstExercise.exercise_id
         )}&sessionId=${encodeURIComponent(payload.sessionId)}`
       );
