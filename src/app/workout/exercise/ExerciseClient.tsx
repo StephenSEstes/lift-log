@@ -76,6 +76,7 @@ export default function ExerciseExecutionPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   const [exerciseSetup, setExerciseSetup] = useState<ExerciseSetupRow | null>(null);
+  const [setupLoadStatus, setSetupLoadStatus] = useState<number | null>(null);
   const [catalogRow, setCatalogRow] = useState<ExerciseCatalogRow | null>(null);
 
   const [weight, setWeight] = useState("");
@@ -243,6 +244,7 @@ export default function ExerciseExecutionPage() {
   useEffect(() => {
     if (!resolvedExerciseKey) {
       setExerciseSetup(null);
+      setSetupLoadStatus(null);
       return;
     }
 
@@ -250,6 +252,7 @@ export default function ExerciseExecutionPage() {
     let cancelled = false;
 
     setExerciseSetup(null);
+    setSetupLoadStatus(null);
 
     (async () => {
       try {
@@ -259,18 +262,27 @@ export default function ExerciseExecutionPage() {
           )}`,
           { signal: controller.signal }
         );
+        if (!response.ok) {
+          if (!cancelled) {
+            setSetupLoadStatus(response.status);
+            setExerciseSetup(null);
+          }
+          return;
+        }
         const data = (await response.json().catch(() => null)) as
           | { found?: boolean; row?: ExerciseSetupRow }
           | null;
 
         if (cancelled) return;
-        if (!response.ok) return;
 
         if (data?.found && data.row) setExerciseSetup(data.row);
         else setExerciseSetup(null);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
-        if (!cancelled) setExerciseSetup(null);
+        if (!cancelled) {
+          setSetupLoadStatus(null);
+          setExerciseSetup(null);
+        }
       }
     })();
 
@@ -663,12 +675,23 @@ export default function ExerciseExecutionPage() {
     return "";
   }, [sessionSets.length, targetSetParam]);
 
+  const parsedSetupJson = useMemo(() => {
+    if (!exerciseSetup?.setupJson) return null;
+    try {
+      const parsed = JSON.parse(exerciseSetup.setupJson) as unknown;
+      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+      return null;
+    } catch {
+      return null;
+    }
+  }, [exerciseSetup?.setupJson]);
+
   if (!state) {
     return (
       <main className="page">
         <header className="page__header">
           <span className="eyebrow">Exercise</span>
-          <h1 className="title">Loading workout...</h1>
+          <h1 className="title">Loading workout session...</h1>
         </header>
         <section className="card">
           <p className="muted">Getting your workout ready.</p>
@@ -677,15 +700,31 @@ export default function ExerciseExecutionPage() {
     );
   }
 
-  if (!exercise) {
+  if (!exercise || state.plan.length === 0) {
     return (
       <main className="page">
         <header className="page__header">
           <span className="eyebrow">Exercise</span>
           <h1 className="title">Loading exercise...</h1>
+          {exerciseKeyParam && <p className="subtitle">{exerciseKeyParam}</p>}
         </header>
-        <section className="card">
-          <p className="muted">Loading exercise details.</p>
+        <section className="card stack">
+          <h3>Setup</h3>
+          {setupLoadStatus && (
+            <p className="muted">Setup load status: {setupLoadStatus}</p>
+          )}
+          {parsedSetupJson && (
+            <div className="stack">
+              {Object.entries(parsedSetupJson).map(([key, value]) => (
+                <div className="row spaced" key={key}>
+                  <span className="muted">{key}</span>
+                  <span>{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {exerciseSetup?.notes && <p className="muted">{exerciseSetup.notes}</p>}
+          {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
         </section>
       </main>
     );
@@ -743,6 +782,23 @@ export default function ExerciseExecutionPage() {
           View Progress
         </button>
       </header>
+
+      <section className="card stack fade-in">
+        <h3>Setup</h3>
+        {setupLoadStatus && <p className="muted">Setup load status: {setupLoadStatus}</p>}
+        {parsedSetupJson && (
+          <div className="stack">
+            {Object.entries(parsedSetupJson).map(([key, value]) => (
+              <div className="row spaced" key={key}>
+                <span className="muted">{key}</span>
+                <span>{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {exerciseSetup?.notes && <p className="muted">{exerciseSetup.notes}</p>}
+        {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
+      </section>
 
       <section className="card stack fade-in">
         <h3>Last session</h3>
