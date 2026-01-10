@@ -438,14 +438,8 @@ export default function WorkoutPlanPage() {
         <p className="subtitle">{activePlan.length} exercises planned</p>
       </header>
 
-      {hasActiveSession && (
-        <section className="card stack">
-          <p className="muted">Workout in progress.</p>
-          <button className="button button--accent" onClick={handleResume}>
-            {hasAnyLoggedSets ? "Resume Workout" : "Begin Workout"}
-          </button>
-        </section>
-      )}
+     
+
       {hasCompletedSession && (
         <section className="card stack">
           <p className="muted">Workout complete.</p>
