@@ -345,7 +345,7 @@ export default function WorkoutPlanPage() {
   const handleResume = () => {
     if (!state?.sessionId || !resumeExercise) return;
     router.push(
-      `/workout/exercise?exerciseKey=${encodeURIComponent(
+      `/workout/ready?exerciseKey=${encodeURIComponent(
         resumeExercise.exercise_id
       )}&sessionId=${encodeURIComponent(state.sessionId)}`
     );
