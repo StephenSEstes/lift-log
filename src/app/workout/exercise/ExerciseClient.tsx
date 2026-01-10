@@ -262,9 +262,9 @@ export default function ExerciseExecutionPage() {
           )}`,
           { signal: controller.signal }
         );
+        if (!cancelled) setSetupLoadStatus(response.status);
         if (!response.ok) {
           if (!cancelled) {
-            setSetupLoadStatus(response.status);
             setExerciseSetup(null);
           }
           return;
@@ -686,6 +686,14 @@ export default function ExerciseExecutionPage() {
     }
   }, [exerciseSetup?.setupJson]);
 
+  const setupNotes = exerciseSetup?.notes?.trim() ?? "";
+  const hasSetupFields = Boolean(parsedSetupJson) || setupNotes.length > 0;
+  const setupRequiresWeightLabel =
+    typeof exerciseSetup?.requiresWeight === "boolean"
+      ? String(exerciseSetup.requiresWeight)
+      : "unknown";
+  const setupUpdatedAtLabel = exerciseSetup?.updatedAt || "unknown";
+
   if (!state) {
     return (
       <main className="page">
@@ -710,8 +718,16 @@ export default function ExerciseExecutionPage() {
         </header>
         <section className="card stack">
           <h3>Setup</h3>
-          {setupLoadStatus && (
-            <p className="muted">Setup load status: {setupLoadStatus}</p>
+          <p className="muted">
+            Exercise key: {resolvedExerciseKey || "(none)"}
+          </p>
+          {setupLoadStatus && <p className="muted">Setup load status: {setupLoadStatus}</p>}
+          {exerciseSetup && (
+            <p className="muted">
+              Setup loaded (updated {setupUpdatedAtLabel}). Rest{" "}
+              {exerciseSetup.defaultRestSeconds}s. Requires weight:{" "}
+              {setupRequiresWeightLabel}
+            </p>
           )}
           {parsedSetupJson && (
             <div className="stack">
@@ -723,7 +739,12 @@ export default function ExerciseExecutionPage() {
               ))}
             </div>
           )}
-          {exerciseSetup?.notes && <p className="muted">{exerciseSetup.notes}</p>}
+          {setupNotes && <p className="muted">{setupNotes}</p>}
+          {exerciseSetup && !hasSetupFields && (
+            <p className="muted">
+              Setup row exists, but no setup fields have been saved yet.
+            </p>
+          )}
           {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
         </section>
       </main>
@@ -785,7 +806,17 @@ export default function ExerciseExecutionPage() {
 
       <section className="card stack fade-in">
         <h3>Setup</h3>
+        <p className="muted">
+          Exercise key: {resolvedExerciseKey || "(none)"}
+        </p>
         {setupLoadStatus && <p className="muted">Setup load status: {setupLoadStatus}</p>}
+        {exerciseSetup && (
+          <p className="muted">
+            Setup loaded (updated {setupUpdatedAtLabel}). Rest{" "}
+            {exerciseSetup.defaultRestSeconds}s. Requires weight:{" "}
+            {setupRequiresWeightLabel}
+          </p>
+        )}
         {parsedSetupJson && (
           <div className="stack">
             {Object.entries(parsedSetupJson).map(([key, value]) => (
@@ -796,7 +827,12 @@ export default function ExerciseExecutionPage() {
             ))}
           </div>
         )}
-        {exerciseSetup?.notes && <p className="muted">{exerciseSetup.notes}</p>}
+        {setupNotes && <p className="muted">{setupNotes}</p>}
+        {exerciseSetup && !hasSetupFields && (
+          <p className="muted">
+            Setup row exists, but no setup fields have been saved yet.
+          </p>
+        )}
         {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
       </section>
 
