@@ -674,14 +674,15 @@ const handleSave = async () => {
         <button className="button button--ghost" onClick={() => router.push(backHref)}>
           Back to workout plan
         </button>
-        <a
-          className="button button--ghost inline-flex items-center justify-center"
-          href={resolvedVideoUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Video
-        </a>
+       <a
+         className="button button--ghost w-full inline-flex items-center justify-center text-center"
+         href={resolvedVideoUrl}
+         target="_blank"
+         rel="noreferrer"
+       >
+         Video
+       </a>
+
         <button
           className="button button--ghost"
           onClick={() => router.push(progressHref)}
