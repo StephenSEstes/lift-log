@@ -207,13 +207,10 @@ export default function ExerciseExecutionPage() {
 
   // Guard routing when state/exercise missing
   useEffect(() => {
-    if (!state) {
-      router.push("/");
-      return;
-    }
+    if (!state) return;
 
     // Only redirect to the plan if we're NOT done with the workout.
-    if (!exercise && state.currentExerciseIndex < state.plan.length) {
+    if (state.plan.length > 0 && !exercise && state.currentExerciseIndex < state.plan.length) {
       router.push("/workout/plan");
     }
   }, [state, exercise, router]);
@@ -666,7 +663,33 @@ export default function ExerciseExecutionPage() {
     return "";
   }, [sessionSets.length, targetSetParam]);
 
-  if (!exercise || !state) return null;
+  if (!state) {
+    return (
+      <main className="page">
+        <header className="page__header">
+          <span className="eyebrow">Exercise</span>
+          <h1 className="title">Loading workout...</h1>
+        </header>
+        <section className="card">
+          <p className="muted">Getting your workout ready.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!exercise) {
+    return (
+      <main className="page">
+        <header className="page__header">
+          <span className="eyebrow">Exercise</span>
+          <h1 className="title">Loading exercise...</h1>
+        </header>
+        <section className="card">
+          <p className="muted">Loading exercise details.</p>
+        </section>
+      </main>
+    );
+  }
 
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
 
