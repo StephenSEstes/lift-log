@@ -683,14 +683,17 @@ export default function ExerciseExecutionPage() {
         </button>
 
         {/* Clean + reliably centered button label and button block */}
+      <div className="w-full flex justify-center">
         <a
-          className="button button--ghost w-full max-w-md mx-auto inline-flex items-center justify-center text-center"
-          href={resolvedVideoUrl}
-          target="_blank"
-          rel="noreferrer"
+          className="button button--ghost w-full max-w-md !inline-flex !items-center !justify-center !text-center"
+           href={resolvedVideoUrl}
+           target="_blank"
+           rel="noreferrer"
         >
           Video
         </a>
+      </div>
+
 
         <button className="button button--ghost" onClick={() => router.push(progressHref)}>
           View Progress
