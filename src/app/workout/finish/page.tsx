@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useMemo, useState } from "react";
 import { useWorkoutSession } from "@/context/workout-session-context";
 
@@ -103,6 +103,12 @@ export default function FinishPage() {
             }}
           >
             Back to workout plan
+          </button>
+          <button
+            className="button button--ghost inline-flex items-center justify-center"
+            onClick={() => signOut({ callbackUrl: "/" })}
+          >
+            Finish & Sign Out
           </button>
           {progressHref && (
             <button
