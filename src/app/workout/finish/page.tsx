@@ -58,6 +58,62 @@ const getBestWeightTimesRepsBySession = (sets: LoggedSet[] | undefined) => {
     .map((sessionId) => bestBySession.get(sessionId) ?? 0);
 };
 
+const getSessionHistoryDetails = (sets: LoggedSet[] | undefined) => {
+  if (!sets || sets.length === 0) return [];
+
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const bestWeightBySession = new Map<string, number>();
+  const bestWeightTimesRepsBySession = new Map<string, number>();
+  const sessionDateBySession = new Map<string, string>();
+
+  for (const set of sets) {
+    if (!seen.has(set.session_id)) {
+      if (order.length >= 12) continue;
+      seen.add(set.session_id);
+      order.push(set.session_id);
+    }
+
+    if (!seen.has(set.session_id)) continue;
+
+    const weightNum = Number(set.weight);
+    const weightValue = Number.isFinite(weightNum) ? weightNum : 0;
+    const wtXRepsValue = getWeightTimesRepsValue(set);
+
+    const previousWeight = bestWeightBySession.get(set.session_id);
+    if (previousWeight === undefined || weightValue > previousWeight) {
+      bestWeightBySession.set(set.session_id, weightValue);
+    }
+
+    const previousWtXReps = bestWeightTimesRepsBySession.get(set.session_id);
+    if (previousWtXReps === undefined || wtXRepsValue > previousWtXReps) {
+      bestWeightTimesRepsBySession.set(set.session_id, wtXRepsValue);
+    }
+
+    const parsed = Date.parse(set.set_timestamp);
+    if (Number.isFinite(parsed)) {
+      const existing = sessionDateBySession.get(set.session_id);
+      if (!existing || parsed > Date.parse(existing)) {
+        sessionDateBySession.set(set.session_id, set.set_timestamp);
+      }
+    }
+  }
+
+  return order
+    .slice(0, 12)
+    .reverse()
+    .map((sessionId) => {
+      const dateRaw = sessionDateBySession.get(sessionId);
+      const dateLabel = dateRaw ? new Date(dateRaw).toLocaleDateString() : "—";
+      return {
+        sessionId,
+        dateLabel,
+        bestWeight: bestWeightBySession.get(sessionId) ?? 0,
+        bestWeightTimesReps: bestWeightTimesRepsBySession.get(sessionId) ?? 0,
+      };
+    });
+};
+
 const getMostRecentSessionId = (sets: LoggedSet[]) => {
   let latestId: string | null = null;
   let latestTime = -Infinity;
@@ -169,6 +225,7 @@ export default function FinishPage() {
   const { state, clear } = useWorkoutSession();
   const [historyByExercise, setHistoryByExercise] = useState<HistoryMap>({});
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
   const performedExercises = useMemo<ExerciseSummary[]>(() => {
     if (!state) return [];
@@ -305,6 +362,11 @@ export default function FinishPage() {
         const sparklineValues = getBestWeightTimesRepsBySession(
           history?.recentSets ?? []
         );
+        const sessionHistoryDetails = getSessionHistoryDetails(
+          history?.recentSets ?? []
+        );
+        const isExpanded = Boolean(expandedHistory[exercise.exerciseId]);
+        const detailsId = `history-details-${exercise.exerciseId}`;
         const previousSessionId = getMostRecentSessionId(historySets);
         const previousSessionSets = previousSessionId
           ? historySets.filter((set) => set.session_id === previousSessionId)
@@ -349,7 +411,45 @@ export default function FinishPage() {
                 {loadingHistory ? (
                   <p className="muted">Loading history...</p>
                 ) : sparklineValues.length > 0 ? (
-                  <Sparkline values={sparklineValues} />
+                  <>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={() =>
+                        setExpandedHistory((prev) => ({
+                          ...prev,
+                          [exercise.exerciseId]: !prev[exercise.exerciseId],
+                        }))
+                      }
+                      aria-expanded={isExpanded}
+                      aria-controls={detailsId}
+                    >
+                      {isExpanded ? "Hide history details" : "View history details"}
+                    </button>
+                    <Sparkline values={sparklineValues} />
+                    {isExpanded && (
+                      <div className="stack" id={detailsId}>
+                        <span className="muted">History details</span>
+                        {sessionHistoryDetails.length > 0 ? (
+                          <div className="stack">
+                            {sessionHistoryDetails.map((entry) => (
+                              <div className="row spaced" key={entry.sessionId}>
+                                <span className="muted">{entry.dateLabel}</span>
+                                <span>
+                                  {formatNumber(entry.bestWeightTimesReps)} w×r
+                                  {entry.bestWeight > 0
+                                    ? ` · ${formatNumber(entry.bestWeight)} lb`
+                                    : ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="muted">No history yet.</p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p className="muted">No history yet.</p>
                 )}
