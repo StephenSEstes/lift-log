@@ -89,7 +89,7 @@ export default function ExerciseExecutionPage() {
 
   const [isResting, setIsResting] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
-  const [restTargetSeconds, setRestTargetSeconds] = useState(120);
+  const [restTargetSeconds, setRestTargetSeconds] = useState(60);
 
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editingSetNumber, setEditingSetNumber] = useState<number | null>(null);
@@ -97,7 +97,7 @@ export default function ExerciseExecutionPage() {
 
   const restStartRef = useRef<number | null>(null);
   const restBeepedRef = useRef(false);
-  const restTargetRef = useRef(120);
+  const restTargetRef = useRef(60);
   const lastSavedSetIdRef = useRef<string | null>(null);
   const lastRestSecondsRef = useRef(0);
   const skipDefaultRef = useRef(false);
@@ -321,20 +321,12 @@ export default function ExerciseExecutionPage() {
   // Resolve rest default + requiresWeight from setup and catalog
   useEffect(() => {
     const setupRest = Number(exerciseSetup?.defaultRestSeconds ?? 0);
-    const catalogRest = Number(catalogRow?.defaultRestSeconds ?? 0);
 
-    const restDefault =
-      Number.isFinite(setupRest) && setupRest > 0
-        ? setupRest
-        : Number.isFinite(catalogRest) && catalogRest > 0
-        ? catalogRest
-        : 120;
+    const restDefault = Number.isFinite(setupRest) && setupRest > 0 ? setupRest : 60;
 
     const resolvedRequiresWeight =
       typeof exerciseSetup?.requiresWeight === "boolean"
         ? exerciseSetup.requiresWeight
-        : typeof catalogRow?.defaultRequiresWeight === "boolean"
-        ? catalogRow.defaultRequiresWeight
         : true;
 
     setRestTargetSeconds(restDefault);
@@ -342,7 +334,7 @@ export default function ExerciseExecutionPage() {
 
     setRequiresWeight(resolvedRequiresWeight);
     if (!resolvedRequiresWeight) setWeight("");
-  }, [exerciseSetup, catalogRow]);
+  }, [exerciseSetup]);
 
   // Default inputs from latest non-skipped set (session first, then history), or exercise target reps
   useEffect(() => {
@@ -394,14 +386,14 @@ export default function ExerciseExecutionPage() {
     const start = Date.now();
     if (restStartRef.current == null) restStartRef.current = start;
 
-    const initialTarget = restTargetRef.current ?? 120;
+    const initialTarget = restTargetRef.current ?? 60;
     setRestSeconds(initialTarget);
 
     const id = window.setInterval(() => {
       const startEpoch = restStartRef.current ?? start;
       const elapsed = Math.floor((Date.now() - startEpoch) / 1000);
 
-      const targetSeconds = restTargetRef.current ?? 120;
+      const targetSeconds = restTargetRef.current ?? 60;
       const remaining = Math.max(targetSeconds - elapsed, 0);
       const overtime = Math.max(elapsed - targetSeconds, 0);
 
@@ -517,7 +509,7 @@ export default function ExerciseExecutionPage() {
       resetInputs();
 
       if (setNumber < totalSets) {
-        const nextTarget = state.defaultRestSeconds ?? 120;
+        const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
         setRestTargetSeconds(nextTarget);
         restTargetRef.current = nextTarget;
         setRestSeconds(0);
@@ -637,7 +629,7 @@ export default function ExerciseExecutionPage() {
     resetInputs();
 
     if (setNumber < totalSets) {
-      const nextTarget = typeof state.defaultRestSeconds === "number" ? state.defaultRestSeconds : 120;
+      const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
       const resolved = Number.isFinite(nextTarget) ? Math.max(0, nextTarget) : 120;
       setRestTargetSeconds(resolved);
       restTargetRef.current = resolved;
@@ -653,6 +645,64 @@ export default function ExerciseExecutionPage() {
         );
       }
     }
+  };
+
+  const handleEndRest = async () => {
+    if (!state) return;
+
+    const startEpoch = restStartRef.current;
+    const duration = startEpoch ? Math.floor((Date.now() - startEpoch) / 1000) : 0;
+    lastRestSecondsRef.current = duration;
+
+    const target = restTargetSeconds;
+
+    // Update local last set rest values
+    updateState((prev) => {
+      if (!prev) return prev;
+
+      const nextSets = [...prev.sets];
+      const lastIndex = nextSets.length - 1;
+
+      if (lastIndex >= 0) {
+        const lastSet = nextSets[lastIndex];
+        nextSets[lastIndex] = {
+          ...lastSet,
+          rest_seconds: duration.toString(),
+          rest_target_seconds: target.toString(),
+        };
+      }
+
+      return { ...prev, sets: nextSets };
+    });
+
+    // Persist rest to Sheets for the last saved set (if present)
+    try {
+      if (lastSavedSetIdRef.current) {
+        await fetch("/api/sheets/sets/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            setId: lastSavedSetIdRef.current,
+            restSec: duration,
+            restTargetSec: target,
+          }),
+        });
+      } else {
+        console.warn("Missing lastSavedSetIdRef; skipping rest update.");
+      }
+    } catch (err) {
+      console.warn("Failed to update rest values in Sheets", err);
+    }
+
+    // Reset rest state
+    setIsResting(false);
+    setRestSeconds(0);
+    restStartRef.current = null;
+
+    // Clear selection state after rest
+    setEditingSetId(null);
+    setEditingSetNumber(null);
+    lastSavedSetIdRef.current = null;
   };
 
   const lastRpeValue = useMemo(() => {
@@ -763,6 +813,30 @@ export default function ExerciseExecutionPage() {
         </button>
       </header>
 
+      <section className="card stack">
+        {isResting && (
+          <>
+            <h3>Rest</h3>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div style={{ fontSize: "5rem", fontWeight: 700, lineHeight: 1 }}>
+                {restBeepedRef.current ? `+${formatElapsed(restSeconds)}` : formatElapsed(restSeconds)}
+              </div>
+              <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
+              <button className="button button--accent" onClick={handleEndRest}>
+                Begin Next Set
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="card stack fade-in">
         <h3>Setup</h3>
         {exerciseSetup?.defaultRestSeconds ? (
@@ -847,79 +921,7 @@ export default function ExerciseExecutionPage() {
       )}
 
       <section className="card stack">
-        {isResting ? (
-          <>
-            <h3>Rest</h3>
-            <p className="muted">
-              {restBeepedRef.current
-                ? `Overtime +${formatElapsed(restSeconds)}`
-                : `Rest ${formatElapsed(restSeconds)} remaining`}
-            </p>
-
-            <button
-              className="button button--accent"
-              onClick={async () => {
-                if (!state) return;
-
-                const startEpoch = restStartRef.current;
-                const duration = startEpoch ? Math.floor((Date.now() - startEpoch) / 1000) : 0;
-                lastRestSecondsRef.current = duration;
-
-                const target = restTargetSeconds;
-
-                // Update local last set rest values
-                updateState((prev) => {
-                  if (!prev) return prev;
-
-                  const nextSets = [...prev.sets];
-                  const lastIndex = nextSets.length - 1;
-
-                  if (lastIndex >= 0) {
-                    const lastSet = nextSets[lastIndex];
-                    nextSets[lastIndex] = {
-                      ...lastSet,
-                      rest_seconds: duration.toString(),
-                      rest_target_seconds: target.toString(),
-                    };
-                  }
-
-                  return { ...prev, sets: nextSets };
-                });
-
-                // Persist rest to Sheets for the last saved set (if present)
-                try {
-                  if (lastSavedSetIdRef.current) {
-                    await fetch("/api/sheets/sets/update", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        setId: lastSavedSetIdRef.current,
-                        restSec: duration,
-                        restTargetSec: target,
-                      }),
-                    });
-                  } else {
-                    console.warn("Missing lastSavedSetIdRef; skipping rest update.");
-                  }
-                } catch (err) {
-                  console.warn("Failed to update rest values in Sheets", err);
-                }
-
-                // Reset rest state
-                setIsResting(false);
-                setRestSeconds(0);
-                restStartRef.current = null;
-
-                // Clear selection state after rest
-                setEditingSetId(null);
-                setEditingSetNumber(null);
-                lastSavedSetIdRef.current = null;
-              }}
-            >
-              Begin Next Set
-            </button>
-          </>
-        ) : (
+        {!isResting && (
           <>
             <h3>Log this set</h3>
 

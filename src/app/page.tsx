@@ -26,14 +26,13 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 export default function Home() {
   const { data: session } = useSession();
-  const { state, setState } = useWorkoutSession();
+  const { setState } = useWorkoutSession();
   const router = useRouter();
 
   const [selectedDay, setSelectedDay] = useState(getTodayPlanDay());
   const [planRows, setPlanRows] = useState<ExercisePlan[]>([]);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
   const [selections, setSelections] = useState<ExerciseSelection[]>([]);
-  const [defaultRestSeconds, setDefaultRestSeconds] = useState(90);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,12 +101,6 @@ export default function Home() {
     );
   }, [planRows]);
 
-  useEffect(() => {
-    if (state?.defaultRestSeconds) {
-      setDefaultRestSeconds(state.defaultRestSeconds);
-    }
-  }, [state?.defaultRestSeconds]);
-
   const dayOptions = useMemo(() => {
     const unique = new Set(availableDays);
     if (selectedDay) unique.add(selectedDay);
@@ -170,7 +163,6 @@ export default function Home() {
         exercisesPlanned: plan.length,
         exercisesCompleted: 0,
         totalSetsLogged: 0,
-        defaultRestSeconds,
         plan,
         currentExerciseIndex: 0,
         currentSetIndex: 1,
@@ -262,31 +254,6 @@ export default function Home() {
 
           {!loading && planRows.length > 0 && (
             <section className="stack">
-              <div className="card stack">
-                <label className="muted">Default Rest Time (seconds)</label>
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  value={defaultRestSeconds}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setDefaultRestSeconds(Number.isFinite(next) ? next : 0);
-                  }}
-                />
-                <div className="row">
-                  {[30, 60, 90, 120].map((seconds) => (
-                    <button
-                      key={seconds}
-                      className="button button--ghost"
-                      onClick={() => setDefaultRestSeconds(seconds)}
-                    >
-                      {seconds}s
-                    </button>
-                  ))}
-                </div>
-              </div>
               {planRows.map((exercise, index) => {
                 const selection = selections[index];
                 return (

@@ -48,7 +48,6 @@ export type WorkoutSessionState = {
   exercisesPlanned: number;
   exercisesCompleted: number;
   totalSetsLogged: number;
-  defaultRestSeconds: number;
   plan: ExercisePlan[];
   currentExerciseIndex: number;
   currentSetIndex: number;
@@ -84,7 +83,6 @@ export const createNewSession = (planDay: string): WorkoutSessionState => ({
   exercisesPlanned: 0,
   exercisesCompleted: 0,
   totalSetsLogged: 0,
-  defaultRestSeconds: 90,
   plan: [],
   currentExerciseIndex: 0,
   currentSetIndex: 1,

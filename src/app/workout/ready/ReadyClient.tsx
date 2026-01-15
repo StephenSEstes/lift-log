@@ -185,12 +185,7 @@ export default function ReadyClient() {
     setDefaultRestSeconds(String(restDefault));
     setSetupNotes(exerciseSetup?.notes ?? "");
     setRequiresWeight(resolvedRequiresWeight);
-    updateState((prev) =>
-      prev.defaultRestSeconds === restDefault
-        ? prev
-        : { ...prev, defaultRestSeconds: restDefault }
-    );
-  }, [exercise, exerciseSetup, catalogRow, hasUserEdited, updateState]);
+  }, [exercise, exerciseSetup, catalogRow, hasUserEdited]);
 
   if (!state || !exercise) {
     return null;
@@ -282,11 +277,6 @@ export default function ReadyClient() {
         createdAt: prev?.createdAt ?? now,
         updatedAt: now,
       }));
-      updateState((prev) =>
-        prev.defaultRestSeconds === normalized
-          ? prev
-          : { ...prev, defaultRestSeconds: normalized }
-      );
       setSaveMessage("Setup saved.");
     } catch (err: unknown) {
       setSaveMessage(getErrorMessage(err, "Failed to save setup."));

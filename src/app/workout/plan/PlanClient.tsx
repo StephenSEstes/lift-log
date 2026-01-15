@@ -362,8 +362,6 @@ export default function WorkoutPlanPage() {
   const handleBegin = async () => {
     if (!firstExercise || !session) return;
 
-    const restDefault = getRestTarget(firstExercise);
-
     if (hasActiveSession) {
       handleResume();
       return;
@@ -394,7 +392,6 @@ export default function WorkoutPlanPage() {
         exercisesPlanned: activePlan.length,
         exercisesCompleted: 0,
         totalSetsLogged: 0,
-        defaultRestSeconds: restDefault,
         plan: activePlan,
         currentExerciseIndex: 0,
         currentSetIndex: 1,

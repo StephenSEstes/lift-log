@@ -54,7 +54,7 @@ export default function FinishPage() {
         exercises_planned: state.exercisesPlanned.toString(),
         exercises_completed: state.exercisesCompleted.toString(),
         total_sets_logged: state.totalSetsLogged.toString(),
-        default_rest_seconds: state.defaultRestSeconds.toString(),
+        default_rest_seconds: "",
         notes: state.notes,
         created_at: new Date().toISOString(),
       },
