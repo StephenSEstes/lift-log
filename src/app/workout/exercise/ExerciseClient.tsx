@@ -802,29 +802,147 @@ export default function ExerciseExecutionPage() {
         {targetHelper && <p className="muted">{targetHelper}</p>}
       </header>
 
-      <section className="card stack">
-        {isResting && (
-          <>
-            <h3>Rest</h3>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
+      {isResting && (
+        <section className="card stack">
+          <h3>Rest</h3>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ fontSize: "5rem", fontWeight: 700, lineHeight: 1 }}>
+              {restBeepedRef.current ? `+${formatElapsed(restSeconds)}` : formatElapsed(restSeconds)}
+            </div>
+            <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
+            <button className="button button--accent" onClick={handleEndRest}>
+              Begin Next Set
+            </button>
+          </div>
+        </section>
+      )}
+
+      {!isResting && (
+        <section className="card stack">
+          <h3>Log this set</h3>
+
+          {editingSetNumber && <p className="muted">Editing: Set {editingSetNumber}</p>}
+
+          <div className="row">
+            {requiresWeight && (
+              <div>
+                <label className="muted">Weight</label>
+                <input
+                  className="input input--inline"
+                  type="number"
+                  inputMode="decimal"
+                  value={weight}
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="lbs/kg"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="muted">Reps</label>
+              <input
+                className="input input--inline"
+                type="number"
+                inputMode="numeric"
+                value={reps}
+                onChange={(event) => setReps(event.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div className="row spaced">
+            <label className="muted">RPE (optional)</label>
+            <div className="row" style={{ alignItems: "center", flex: 1 }}>
+              <input
+                className="input"
+                type="range"
+                min={1}
+                max={10}
+                step={0.5}
+                value={rpe}
+                onChange={(event) => setRpe(normalizeRpe(event.target.value))}
+                aria-label="RPE"
+                style={{ flex: 1 }}
+              />
+              <span className="muted" style={{ minWidth: 36, textAlign: "right" }}>
+                {rpeDisplay}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => setShowRpeLegend((prev) => !prev)}
+          >
+            What&apos;s RPE?
+          </button>
+
+          {showRpeLegend && (
+            <div className="stack">
+              <p className="muted">RPE 10 = Max effort (0 reps left)</p>
+              <p className="muted">RPE 9 = 1 rep left</p>
+              <p className="muted">RPE 8 = 2 reps left</p>
+              <p className="muted">RPE 7 = 3 reps left</p>
+              <p className="muted">RPE 6 = 4+ reps left</p>
+            </div>
+          )}
+
+          <div className="row">
+            <button
+              className="button button--accent"
+              onClick={() => {
+                if (editingSetId) handleUpdateSelectedSet();
+                else handleSave();
+              }}
+              disabled={!reps || (requiresWeight && !weight)}
+            >
+              {editingSetId
+                ? editingSetNumber
+                  ? `Update Set ${editingSetNumber}`
+                  : "Update Selected Set"
+                : `Save ${displayName || "Exercise"} Set ${nextSetNumber}`}
+            </button>
+
+            <button className="button button--ghost" onClick={handleSkip}>
+              Skip Set
+            </button>
+          </div>
+
+          {editingSetId && (
+            <button
+              className="button button--ghost"
+              onClick={() => {
+                setEditingSetId(null);
+                setEditingSetNumber(null);
+                setUpdateError(null);
+                setRpe(5);
               }}
             >
-              <div style={{ fontSize: "5rem", fontWeight: 700, lineHeight: 1 }}>
-                {restBeepedRef.current ? `+${formatElapsed(restSeconds)}` : formatElapsed(restSeconds)}
-              </div>
-              <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
-              <button className="button button--accent" onClick={handleEndRest}>
-                Begin Next Set
-              </button>
-            </div>
-          </>
-        )}
-      </section>
+              Clear Selection
+            </button>
+          )}
+
+          <div className="stack">
+            <label className="muted">Skip reason (optional)</label>
+            <input
+              className="input"
+              type="text"
+              value={skipReason}
+              onChange={(event) => setSkipReason(event.target.value)}
+              placeholder="Equipment taken, pain, etc."
+            />
+          </div>
+        </section>
+      )}
 
       <section className="card stack fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -930,128 +1048,6 @@ export default function ExerciseExecutionPage() {
           </div>
         </section>
       )}
-
-      <section className="card stack">
-        {!isResting && (
-          <>
-            <h3>Log this set</h3>
-
-            {editingSetNumber && <p className="muted">Editing: Set {editingSetNumber}</p>}
-
-            <div className="row">
-              {requiresWeight && (
-                <div>
-                  <label className="muted">Weight</label>
-                  <input
-                    className="input input--inline"
-                    type="number"
-                    inputMode="decimal"
-                    value={weight}
-                    onChange={(event) => setWeight(event.target.value)}
-                    placeholder="lbs/kg"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="muted">Reps</label>
-                <input
-                  className="input input--inline"
-                  type="number"
-                  inputMode="numeric"
-                  value={reps}
-                  onChange={(event) => setReps(event.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="row spaced">
-              <label className="muted">RPE (optional)</label>
-              <div className="row" style={{ alignItems: "center", flex: 1 }}>
-                <input
-                  className="input"
-                  type="range"
-                  min={1}
-                  max={10}
-                  step={0.5}
-                  value={rpe}
-                  onChange={(event) => setRpe(normalizeRpe(event.target.value))}
-                  aria-label="RPE"
-                  style={{ flex: 1 }}
-                />
-                <span className="muted" style={{ minWidth: 36, textAlign: "right" }}>
-                  {rpeDisplay}
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="button button--ghost"
-              onClick={() => setShowRpeLegend((prev) => !prev)}
-            >
-              What&apos;s RPE?
-            </button>
-
-            {showRpeLegend && (
-              <div className="stack">
-                <p className="muted">RPE 10 = Max effort (0 reps left)</p>
-                <p className="muted">RPE 9 = 1 rep left</p>
-                <p className="muted">RPE 8 = 2 reps left</p>
-                <p className="muted">RPE 7 = 3 reps left</p>
-                <p className="muted">RPE 6 = 4+ reps left</p>
-              </div>
-            )}
-
-            <div className="row">
-              <button
-                className="button button--accent"
-                onClick={() => {
-                  if (editingSetId) handleUpdateSelectedSet();
-                  else handleSave();
-                }}
-                disabled={!reps || (requiresWeight && !weight)}
-              >
-                {editingSetId
-                  ? editingSetNumber
-                    ? `Update Set ${editingSetNumber}`
-                    : "Update Selected Set"
-                  : `Save ${displayName || "Exercise"} Set ${nextSetNumber}`}
-              </button>
-
-              <button className="button button--ghost" onClick={handleSkip}>
-                Skip Set
-              </button>
-            </div>
-
-            {editingSetId && (
-              <button
-                className="button button--ghost"
-                onClick={() => {
-                  setEditingSetId(null);
-                  setEditingSetNumber(null);
-                  setUpdateError(null);
-                  setRpe(5);
-                }}
-              >
-                Clear Selection
-              </button>
-            )}
-
-            <div className="stack">
-              <label className="muted">Skip reason (optional)</label>
-              <input
-                className="input"
-                type="text"
-                value={skipReason}
-                onChange={(event) => setSkipReason(event.target.value)}
-                placeholder="Equipment taken, pain, etc."
-              />
-            </div>
-          </>
-        )}
-      </section>
 
         {/* Sticky footer with primary actions (kept behavior/routing unchanged) */}
         <div
