@@ -463,8 +463,8 @@ export default function FinishPage() {
         <button
           className="button button--accent"
           onClick={() => {
-            clear();
             router.push("/workout/plan");
+            clear();
           }}
         >
           Back to workout plan
