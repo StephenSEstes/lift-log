@@ -90,3 +90,36 @@ export const createNewSession = (planDay: string): WorkoutSessionState => ({
   exerciseNotes: {},
   notes: "",
 });
+
+export type PrValues = {
+  prMaxWeight: number | null;
+  prMaxWeightTimesReps: number | null;
+};
+
+export const computePrValues = (
+  sets: LoggedSet[] | null | undefined
+): PrValues => {
+  const all = sets ?? [];
+  if (!all.length) {
+    return { prMaxWeight: null, prMaxWeightTimesReps: null };
+  }
+
+  let maxWeight = -Infinity;
+  let maxWtXReps = -Infinity;
+
+  for (const s of all) {
+    const w = Number(s.weight);
+    const repsNum = Number(s.reps) || 0;
+
+    if (Number.isFinite(w) && w > maxWeight) maxWeight = w;
+
+    const usedW = Number.isFinite(w) && w > 0 ? w : 1;
+    const product = usedW * repsNum;
+    if (Number.isFinite(product) && product > maxWtXReps) maxWtXReps = product;
+  }
+
+  return {
+    prMaxWeight: maxWeight === -Infinity ? null : maxWeight,
+    prMaxWeightTimesReps: maxWtXReps === -Infinity ? null : maxWtXReps,
+  };
+};

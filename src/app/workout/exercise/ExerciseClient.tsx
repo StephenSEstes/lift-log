@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
+import { computePrValues } from "@/lib/workout";
 
 type HistoryResponse = {
   lastSessionDate: string | null;
@@ -714,26 +715,7 @@ export default function ExerciseExecutionPage() {
 
   const prValues = useMemo(() => {
     const all = history?.recentSets ?? history?.sets ?? [];
-    if (!all || all.length === 0) return { prMaxWeight: null as number | null, prMaxWeightTimesReps: null as number | null };
-
-    let maxWeight = -Infinity;
-    let maxWtXReps = -Infinity;
-
-    for (const s of all) {
-      const w = Number(s.weight);
-      const repsNum = Number(s.reps) || 0;
-
-      if (Number.isFinite(w) && w > maxWeight) maxWeight = w;
-
-      const usedW = Number.isFinite(w) && w > 0 ? w : 1;
-      const product = usedW * repsNum;
-      if (Number.isFinite(product) && product > maxWtXReps) maxWtXReps = product;
-    }
-
-    return {
-      prMaxWeight: maxWeight === -Infinity ? null : maxWeight,
-      prMaxWeightTimesReps: maxWtXReps === -Infinity ? null : maxWtXReps,
-    };
+    return computePrValues(all);
   }, [history]);
 
   const targetHelper = useMemo(() => {
