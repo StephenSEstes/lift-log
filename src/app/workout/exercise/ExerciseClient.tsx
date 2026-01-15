@@ -809,7 +809,7 @@ export default function ExerciseExecutionPage() {
   const nextSetNumber = sessionSets.length + 1;
 
   return (
-    <main className="page">
+    <main className="page pb-24 md:pb-28">
       <header className="page__header">
         <span className="eyebrow">Exercise</span>
         <h1 className="title">{displayName}</h1>
@@ -818,24 +818,6 @@ export default function ExerciseExecutionPage() {
         </p>
 
         {targetHelper && <p className="muted">{targetHelper}</p>}
-
-        <button className="button button--ghost" onClick={() => router.push(backHref)}>
-          Back to workout plan
-        </button>
-
-        <button
-          type="button"
-          className="button button--ghost w-full"
-           onClick={() => window.open(resolvedVideoUrl, "_blank", "noreferrer")}
-         >
-           Video
-         </button>
-
-
-
-        <button className="button button--ghost" onClick={() => router.push(progressHref)}>
-          View Progress
-        </button>
       </header>
 
       <section className="card stack">
@@ -1088,6 +1070,39 @@ export default function ExerciseExecutionPage() {
           </>
         )}
       </section>
+
+        {/* Sticky footer with primary actions (kept behavior/routing unchanged) */}
+        <div
+          className="fixed inset-x-0 bottom-0 border-t z-50"
+          style={{
+            background: "rgba(255,255,255,0.75)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div className="max-w-5xl mx-auto px-4 py-2 md:py-3 flex gap-2 flex-wrap items-center">
+            <button
+              className="button button--ghost w-full md:w-auto"
+              onClick={() => router.push(backHref)}
+            >
+              Back to workout plan
+            </button>
+
+            <button
+              type="button"
+              className="button button--ghost w-full md:w-auto"
+              onClick={() => window.open(resolvedVideoUrl, "_blank", "noreferrer")}
+            >
+              Video
+            </button>
+
+            <button
+              className="button button--ghost w-full md:w-auto"
+              onClick={() => router.push(progressHref)}
+            >
+              View Progress
+            </button>
+          </div>
+        </div>
     </main>
   );
 }
