@@ -944,7 +944,7 @@ export default function ExerciseExecutionPage() {
         </section>
       )}
 
-      <section className="card stack fade-in">
+      <section className="card fade-in">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <h3>Setup</h3>
