@@ -58,6 +58,57 @@ const getBestWeightTimesRepsBySession = (sets: LoggedSet[] | undefined) => {
     .map((sessionId) => bestBySession.get(sessionId) ?? 0);
 };
 
+const getMostRecentSessionId = (sets: LoggedSet[]) => {
+  let latestId: string | null = null;
+  let latestTime = -Infinity;
+
+  for (const set of sets) {
+    const parsed = Date.parse(set.set_timestamp);
+    const time = Number.isFinite(parsed) ? parsed : -Infinity;
+    if (time > latestTime) {
+      latestTime = time;
+      latestId = set.session_id;
+    }
+  }
+
+  return latestId;
+};
+
+const getDeltaValue = (current: number | null, previous: number | null) => {
+  if (current == null || previous == null) return null;
+  return current - previous;
+};
+
+const formatNumber = (value: number) => {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+};
+
+const TrendDelta = ({
+  delta,
+  unitLabel = "",
+}: {
+  delta: number | null;
+  unitLabel?: string;
+}) => {
+  if (delta == null) {
+    return <span className="muted">—</span>;
+  }
+
+  const direction = delta > 0 ? "^" : delta < 0 ? "v" : "-";
+  const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
+  const value = formatNumber(Math.abs(delta));
+  const unit = unitLabel ? ` ${unitLabel}` : "";
+
+  return (
+    <span className="muted">
+      {direction} {sign}
+      {value}
+      {unit}
+    </span>
+  );
+};
+
 const Sparkline = ({
   values,
   width = 140,
@@ -254,6 +305,19 @@ export default function FinishPage() {
         const sparklineValues = getBestWeightTimesRepsBySession(
           history?.recentSets ?? []
         );
+        const previousSessionId = getMostRecentSessionId(historySets);
+        const previousSessionSets = previousSessionId
+          ? historySets.filter((set) => set.session_id === previousSessionId)
+          : [];
+        const previousSessionBest = computePrValues(previousSessionSets);
+        const prWeightDelta = getDeltaValue(
+          prValues.prMaxWeight,
+          previousSessionBest.prMaxWeight
+        );
+        const prWeightTimesRepsDelta = getDeltaValue(
+          prValues.prMaxWeightTimesReps,
+          previousSessionBest.prMaxWeightTimesReps
+        );
 
         return (
           <section className="card stack" key={exercise.exerciseId}>
@@ -266,11 +330,17 @@ export default function FinishPage() {
               <div className="stack">
                 <div className="row spaced">
                   <span className="muted">PR Max Weight</span>
-                  <strong>{prValues.prMaxWeight ?? "-"}</strong>
+                  <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                    <strong>{prValues.prMaxWeight ?? "-"}</strong>
+                    <TrendDelta delta={prWeightDelta} unitLabel="lb" />
+                  </div>
                 </div>
                 <div className="row spaced">
                   <span className="muted">PR Max Weight × Reps</span>
-                  <strong>{prValues.prMaxWeightTimesReps ?? "-"}</strong>
+                  <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                    <strong>{prValues.prMaxWeightTimesReps ?? "-"}</strong>
+                    <TrendDelta delta={prWeightTimesRepsDelta} />
+                  </div>
                 </div>
               </div>
 
