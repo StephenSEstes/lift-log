@@ -945,8 +945,11 @@ export default function ExerciseExecutionPage() {
       )}
 
       <section className="card fade-in">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
+        <div
+          className="row"
+          style={{ alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}
+        >
+          <div style={{ flex: "1 1 320px", minWidth: 320 }}>
             <h3>Setup</h3>
             {exerciseSetup?.defaultRestSeconds ? (
               <p className="muted">Rest: {exerciseSetup.defaultRestSeconds}s</p>
@@ -960,7 +963,7 @@ export default function ExerciseExecutionPage() {
             {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
           </div>
 
-          <div>
+          <div style={{ flex: "1 1 320px", minWidth: 320 }}>
             <h3>Last session</h3>
 
             {loadingHistory && <p className="muted">Loading history...</p>}
