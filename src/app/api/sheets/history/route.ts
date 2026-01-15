@@ -35,19 +35,34 @@ export async function GET(request: Request) {
   });
 
   if (!matching.length) {
-    return NextResponse.json({ lastSessionDate: null, sets: [] });
+    return NextResponse.json({ lastSessionDate: null, sets: [], recentSets: [] });
   }
 
   const sorted = [...matching].sort((a, b) =>
     b.set_timestamp.localeCompare(a.set_timestamp)
   );
+
+  // Determine the latest session id and return those sets as the "last session" (preserves existing behavior)
   const latestSessionId = sorted[0].session_id;
   const latestSets = matching
     .filter((set) => set.session_id === latestSessionId)
     .sort((a, b) => a.set_number - b.set_number);
 
+  // Also include recent sets across the last N sessions for PR calculations.
+  const MAX_SESSIONS = 12;
+  const sessionOrder: string[] = [];
+  for (const s of sorted) {
+    if (!sessionOrder.includes(s.session_id)) sessionOrder.push(s.session_id);
+    if (sessionOrder.length >= MAX_SESSIONS) break;
+  }
+
+  const recentSets = matching
+    .filter((set) => sessionOrder.includes(set.session_id))
+    .sort((a, b) => b.set_timestamp.localeCompare(a.set_timestamp));
+
   return NextResponse.json({
     lastSessionDate: sorted[0].set_timestamp,
     sets: latestSets,
+    recentSets,
   });
 }

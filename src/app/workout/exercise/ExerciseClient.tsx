@@ -8,6 +8,7 @@ import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
 type HistoryResponse = {
   lastSessionDate: string | null;
   sets: LoggedSet[];
+  recentSets?: LoggedSet[];
 };
 
 type ExerciseSetupRow = {
@@ -711,6 +712,30 @@ export default function ExerciseExecutionPage() {
     return match?.rpe?.toString() ?? "";
   }, [history]);
 
+  const prValues = useMemo(() => {
+    const all = history?.recentSets ?? history?.sets ?? [];
+    if (!all || all.length === 0) return { prMaxWeight: null as number | null, prMaxWeightTimesReps: null as number | null };
+
+    let maxWeight = -Infinity;
+    let maxWtXReps = -Infinity;
+
+    for (const s of all) {
+      const w = Number(s.weight);
+      const repsNum = Number(s.reps) || 0;
+
+      if (Number.isFinite(w) && w > maxWeight) maxWeight = w;
+
+      const usedW = Number.isFinite(w) && w > 0 ? w : 1;
+      const product = usedW * repsNum;
+      if (Number.isFinite(product) && product > maxWtXReps) maxWtXReps = product;
+    }
+
+    return {
+      prMaxWeight: maxWeight === -Infinity ? null : maxWeight,
+      prMaxWeightTimesReps: maxWtXReps === -Infinity ? null : maxWtXReps,
+    };
+  }, [history]);
+
   const targetHelper = useMemo(() => {
     if (!targetSetParam) return "";
     if (targetSetParam <= sessionSets.length) return `Viewing: Set ${targetSetParam}`;
@@ -838,45 +863,67 @@ export default function ExerciseExecutionPage() {
       </section>
 
       <section className="card stack fade-in">
-        <h3>Setup</h3>
-        {exerciseSetup?.defaultRestSeconds ? (
-          <p className="muted">Rest: {exerciseSetup.defaultRestSeconds}s</p>
-        ) : null}
-        {setupNotes && <p className="muted">Notes: {setupNotes}</p>}
-        {showRequiresWeight && (
-          <p className="muted">
-            {exerciseSetup?.requiresWeight ? "Requires weight" : "No weight required"}
-          </p>
-        )}
-        {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
-      </section>
-
-      <section className="card stack fade-in">
-        <h3>Last session</h3>
-
-        {loadingHistory && <p className="muted">Loading history...</p>}
-
-        {!loadingHistory && (!history || history.sets.length === 0) && (
-          <p className="muted">No history yet.</p>
-        )}
-
-        {!loadingHistory && history && history.sets.length > 0 && (
-          <div className="stack">
-            <p className="muted">Most recent: {lastSessionLabel}</p>
-            {lastRpeValue && <p className="muted">Last RPE: {lastRpeValue}</p>}
-
-            {history.sets.map((set) => (
-              <div className="row spaced" key={`${set.session_id}-${set.set_number}`}>
-                <span>Set {set.set_number}</span>
-                <span className="muted">
-                  {set.is_skipped === "TRUE"
-                    ? `Skipped (${set.skip_reason || "no reason"})`
-                    : `${set.weight || "-"} x ${set.reps || "-"}`}
-                </span>
-              </div>
-            ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3>Setup</h3>
+            {exerciseSetup?.defaultRestSeconds ? (
+              <p className="muted">Rest: {exerciseSetup.defaultRestSeconds}s</p>
+            ) : null}
+            {setupNotes && <p className="muted">Notes: {setupNotes}</p>}
+            {showRequiresWeight && (
+              <p className="muted">
+                {exerciseSetup?.requiresWeight ? "Requires weight" : "No weight required"}
+              </p>
+            )}
+            {!exerciseSetup && <p className="muted">No setup saved for this exercise.</p>}
           </div>
-        )}
+
+          <div>
+            <h3>Last session</h3>
+
+            {loadingHistory && <p className="muted">Loading history...</p>}
+
+            {!loadingHistory && (!history || history.sets.length === 0) && (
+              <p className="muted">No history yet.</p>
+            )}
+
+            {!loadingHistory && history && (
+              <div className="stack">
+                <div className="row spaced">
+                  <span className="muted">Most recent</span>
+                  <span>{lastSessionLabel || "-"}</span>
+                </div>
+
+                <div className="row spaced">
+                  <span className="muted">PR Max Weight</span>
+                  <span>{prValues.prMaxWeight ?? "-"}</span>
+                </div>
+
+                <div className="row spaced">
+                  <span className="muted">PR Max Weight × Reps</span>
+                  <span>{prValues.prMaxWeightTimesReps ?? "-"}</span>
+                </div>
+
+                {lastRpeValue && <p className="muted">Last RPE: {lastRpeValue}</p>}
+
+                {history.sets && history.sets.length > 0 && (
+                  <div className="stack">
+                    {history.sets.map((set) => (
+                      <div className="row spaced" key={`${set.session_id}-${set.set_number}`}>
+                        <span>Set {set.set_number}</span>
+                        <span className="muted">
+                          {set.is_skipped === "TRUE"
+                            ? `Skipped (${set.skip_reason || "no reason"})`
+                            : `${set.weight || "-"} x ${set.reps || "-"}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {sessionSets.length > 0 && (
