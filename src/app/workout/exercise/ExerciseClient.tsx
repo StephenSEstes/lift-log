@@ -214,6 +214,18 @@ export default function ExerciseExecutionPage() {
     if (!state?.draftSets || !draftKey) return null;
     return state.draftSets[draftKey] ?? null;
   }, [state?.draftSets, draftKey]);
+  const defaultSet = useMemo(() => {
+    if (!exercise) return null;
+    const historySets = loadingHistory ? [] : history?.recentSets ?? history?.sets ?? [];
+    const candidates = [...sessionSets, ...historySets].filter(
+      (set) => set.is_skipped !== "TRUE"
+    );
+    if (!candidates.length) return null;
+    const sorted = [...candidates].sort((a, b) =>
+      b.set_timestamp.localeCompare(a.set_timestamp)
+    );
+    return sorted.find((set) => set.set_number === setNumber) ?? sorted[0] ?? null;
+  }, [exercise, history, loadingHistory, sessionSets, setNumber]);
 
   // Guard routing when state/exercise missing
   useEffect(() => {
@@ -815,19 +827,6 @@ export default function ExerciseExecutionPage() {
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = sessionSets.length + 1;
   const weightDisplay = weight ? weight : "--";
-
-  const defaultSet = useMemo(() => {
-    if (!exercise) return null;
-    const historySets = loadingHistory ? [] : history?.recentSets ?? history?.sets ?? [];
-    const candidates = [...sessionSets, ...historySets].filter(
-      (set) => set.is_skipped !== "TRUE"
-    );
-    if (!candidates.length) return null;
-    const sorted = [...candidates].sort((a, b) =>
-      b.set_timestamp.localeCompare(a.set_timestamp)
-    );
-    return sorted.find((set) => set.set_number === setNumber) ?? sorted[0] ?? null;
-  }, [exercise, history, loadingHistory, sessionSets, setNumber]);
 
   return (
     <main className="page pb-24 md:pb-28">
