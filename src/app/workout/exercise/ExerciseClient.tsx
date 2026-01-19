@@ -338,7 +338,7 @@ export default function ExerciseExecutionPage() {
     if (!resolvedRequiresWeight) setWeight("");
   }, [exerciseSetup]);
 
-  // Default inputs from latest non-skipped set (session first, then history), or exercise target reps
+  // Default inputs from latest matching set number, or latest set for the exercise, or exercise target reps.
   useEffect(() => {
     if (!exercise) return;
 
@@ -351,19 +351,13 @@ export default function ExerciseExecutionPage() {
 
     if ((requiresWeight && weight) || reps) return;
 
-    const latestSessionSet = [...sessionSets].reverse().find((set) => set.is_skipped !== "TRUE");
-    const historySets = loadingHistory ? [] : history?.sets ?? [];
-    const latestHistorySet = [...historySets].reverse().find((set) => set.is_skipped !== "TRUE");
-
     const defaultRepMin = Number(exercise.target_rep_min ?? 0);
     const defaultReps =
       Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
 
-    const sourceSet = latestSessionSet ?? latestHistorySet;
-
-    if (sourceSet) {
-      if (requiresWeight) setWeight(sourceSet.weight ?? "");
-      setReps(sourceSet.reps ?? "");
+    if (defaultSet) {
+      if (requiresWeight) setWeight(defaultSet.weight ?? "");
+      setReps(defaultSet.reps ?? "");
       return;
     }
 
@@ -371,11 +365,9 @@ export default function ExerciseExecutionPage() {
   }, [
     exercise,
     editingSetId,
-    history,
-    loadingHistory,
+    defaultSet,
     reps,
     requiresWeight,
-    sessionSets,
     weight,
   ]);
 
@@ -789,6 +781,20 @@ export default function ExerciseExecutionPage() {
 
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = sessionSets.length + 1;
+  const weightDisplay = weight ? weight : "--";
+
+  const defaultSet = useMemo(() => {
+    if (!exercise) return null;
+    const historySets = loadingHistory ? [] : history?.recentSets ?? history?.sets ?? [];
+    const candidates = [...sessionSets, ...historySets].filter(
+      (set) => set.is_skipped !== "TRUE"
+    );
+    if (!candidates.length) return null;
+    const sorted = [...candidates].sort((a, b) =>
+      b.set_timestamp.localeCompare(a.set_timestamp)
+    );
+    return sorted.find((set) => set.set_number === setNumber) ?? sorted[0] ?? null;
+  }, [exercise, history, loadingHistory, sessionSets, setNumber]);
 
   return (
     <main className="page pb-24 md:pb-28">
@@ -817,6 +823,22 @@ export default function ExerciseExecutionPage() {
               {restBeepedRef.current ? `+${formatElapsed(restSeconds)}` : formatElapsed(restSeconds)}
             </div>
             <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
+            {requiresWeight && (
+              <div className="stack" style={{ alignItems: "center" }}>
+                <span className="muted">Target weight</span>
+                <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1 }}>
+                  {weightDisplay}
+                </div>
+                <input
+                  className="input input--inline"
+                  type="number"
+                  inputMode="decimal"
+                  value={weight}
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="lbs/kg"
+                />
+              </div>
+            )}
             <button className="button button--accent" onClick={handleEndRest}>
               Begin Next Set
             </button>
@@ -830,32 +852,36 @@ export default function ExerciseExecutionPage() {
 
           {editingSetNumber && <p className="muted">Editing: Set {editingSetNumber}</p>}
 
-          <div className="row">
-            {requiresWeight && (
+          {requiresWeight && (
+            <div className="row spaced" style={{ alignItems: "baseline" }}>
               <div>
                 <label className="muted">Weight</label>
-                <input
-                  className="input input--inline"
-                  type="number"
-                  inputMode="decimal"
-                  value={weight}
-                  onChange={(event) => setWeight(event.target.value)}
-                  placeholder="lbs/kg"
-                />
+                <div style={{ fontSize: "1.6rem", fontWeight: 600 }}>{weightDisplay}</div>
               </div>
-            )}
-
-            <div>
-              <label className="muted">Reps</label>
-              <input
-                className="input input--inline"
-                type="number"
-                inputMode="numeric"
-                value={reps}
-                onChange={(event) => setReps(event.target.value)}
-                placeholder="0"
-              />
+              <span className="muted" style={{ fontSize: "0.9rem" }}>
+                Adjust during rest
+              </span>
             </div>
+          )}
+
+          <div className="stack" style={{ alignItems: "center" }}>
+            <label className="muted">Reps</label>
+            <input
+              className="input"
+              type="number"
+              inputMode="numeric"
+              value={reps}
+              onChange={(event) => setReps(event.target.value)}
+              placeholder="0"
+              style={{
+                fontSize: "3.25rem",
+                fontWeight: 700,
+                lineHeight: 1.1,
+                textAlign: "center",
+                padding: "16px 20px",
+                maxWidth: 220,
+              }}
+            />
           </div>
 
           <div className="row spaced">

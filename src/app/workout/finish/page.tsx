@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { LoggedSet } from "@/lib/workout";
 import { computePrValues } from "@/lib/workout";
@@ -468,6 +468,12 @@ export default function FinishPage() {
           }}
         >
           Back to workout plan
+        </button>
+        <button
+          className="button button--ghost"
+          onClick={() => signOut({ callbackUrl: "/" })}
+        >
+          Sign out
         </button>
       </section>
     </main>

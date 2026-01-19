@@ -313,9 +313,11 @@ export default function WorkoutPlanPage() {
     );
   }, [sessionId, sessionSets]);
   const resumeExercise = state?.plan?.[state.currentExerciseIndex] ?? state?.plan?.[0] ?? null;
+  const summaryGridMinWidth = 560;
   const summaryGridStyle: CSSProperties = {
-    gridTemplateColumns: "1fr 120px 80px 140px",
+    gridTemplateColumns: "minmax(180px, 1fr) 120px 80px 140px",
     alignItems: "center",
+    minWidth: summaryGridMinWidth,
   };
 
   const getPlanRestDefault = (exercise: ExercisePlan) => {
@@ -447,78 +449,82 @@ export default function WorkoutPlanPage() {
       )}
 
       <section className="card stack">
-        <div className="grid muted" style={summaryGridStyle}>
-          <span>Exercise</span>
-          <span style={{ textAlign: "center" }}>Sets</span>
-          <span style={{ textAlign: "right" }}>Rest</span>
-          <span style={{ textAlign: "right" }}>Progress</span>
-        </div>
-        <div className="stack">
-          {loading && <p className="muted">Loading plan...</p>}
-          {!loading && activePlan.length === 0 && (
-            <p className="muted">
-              {state?.plan?.length === 0
-                ? "No exercises selected for this session."
-                : `No exercises found for ${selectedDay}.`}
-            </p>
-          )}
-          {!loading &&
-            activePlan.map((exercise) => {
-              const restTarget = getRestTarget(exercise);
-              const displayName =
-                catalogMap[exercise.exercise_id]?.exerciseName || exercise.exercise_name;
-              const progress =
-                progressMap.get(exercise.exercise_id) ?? {
-                  loggedCount: 0,
-                  plannedCount: exercise.plannedSets ?? 0,
-                };
-              const progressLabel = loadingSessionSets
-                ? "..."
-                : getProgressLabel(progress.loggedCount, progress.plannedCount);
-              const targetSet = getTargetSetIndex(
-                progress.loggedCount,
-                progress.plannedCount
-              );
-              const nextHref = sessionId
-                ? `/workout/exercise?exerciseKey=${encodeURIComponent(
-                    exercise.exercise_id
-                  )}&sessionId=${encodeURIComponent(sessionId)}${
-                    targetSet ? `&targetSet=${targetSet}` : ""
-                  }`
-                : "";
-              return (
-                <button
-                  type="button"
-                  className="grid"
-                  style={{
-                    ...summaryGridStyle,
-                    textAlign: "left",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: sessionId ? "pointer" : "default",
-                  }}
-                  onClick={() => {
-                    if (!sessionId) return;
-                    router.push(nextHref);
-                  }}
-                  key={exercise.exercise_id}
-                >
-                  <span>{displayName}</span>
-                  <span className="muted" style={{ textAlign: "center" }}>
-                    {exercise.plannedSets} sets
-                  </span>
-                  <span className="muted" style={{ textAlign: "right" }}>
-                    {loadingRestTargets && !restTargets[exercise.exercise_id]
-                      ? "..."
-                      : `${restTarget}s`}
-                  </span>
-                  <span style={{ textAlign: "right" }}>
-                    <span className="tag">{progressLabel}</span>
-                  </span>
-                </button>
-              );
-            })}
+        <div className="overflow-x-auto">
+          <div className="stack" style={{ minWidth: summaryGridMinWidth }}>
+            <div className="grid muted" style={summaryGridStyle}>
+              <span>Exercise</span>
+              <span style={{ textAlign: "center" }}>Sets</span>
+              <span style={{ textAlign: "right" }}>Rest</span>
+              <span style={{ textAlign: "right" }}>Progress</span>
+            </div>
+            <div className="stack">
+              {loading && <p className="muted">Loading plan...</p>}
+              {!loading && activePlan.length === 0 && (
+                <p className="muted">
+                  {state?.plan?.length === 0
+                    ? "No exercises selected for this session."
+                    : `No exercises found for ${selectedDay}.`}
+                </p>
+              )}
+              {!loading &&
+                activePlan.map((exercise) => {
+                  const restTarget = getRestTarget(exercise);
+                  const displayName =
+                    catalogMap[exercise.exercise_id]?.exerciseName || exercise.exercise_name;
+                  const progress =
+                    progressMap.get(exercise.exercise_id) ?? {
+                      loggedCount: 0,
+                      plannedCount: exercise.plannedSets ?? 0,
+                    };
+                  const progressLabel = loadingSessionSets
+                    ? "..."
+                    : getProgressLabel(progress.loggedCount, progress.plannedCount);
+                  const targetSet = getTargetSetIndex(
+                    progress.loggedCount,
+                    progress.plannedCount
+                  );
+                  const nextHref = sessionId
+                    ? `/workout/exercise?exerciseKey=${encodeURIComponent(
+                        exercise.exercise_id
+                      )}&sessionId=${encodeURIComponent(sessionId)}${
+                        targetSet ? `&targetSet=${targetSet}` : ""
+                      }`
+                    : "";
+                  return (
+                    <button
+                      type="button"
+                      className="grid"
+                      style={{
+                        ...summaryGridStyle,
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: sessionId ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        if (!sessionId) return;
+                        router.push(nextHref);
+                      }}
+                      key={exercise.exercise_id}
+                    >
+                      <span>{displayName}</span>
+                      <span className="muted" style={{ textAlign: "center" }}>
+                        {exercise.plannedSets} sets
+                      </span>
+                      <span className="muted" style={{ textAlign: "right" }}>
+                        {loadingRestTargets && !restTargets[exercise.exercise_id]
+                          ? "..."
+                          : `${restTarget}s`}
+                      </span>
+                      <span style={{ textAlign: "right" }}>
+                        <span className="tag">{progressLabel}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
         </div>
       </section>
 
