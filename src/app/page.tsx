@@ -167,6 +167,7 @@ export default function Home() {
         currentExerciseIndex: 0,
         currentSetIndex: 1,
         sets: [],
+        draftSets: {},
         exerciseNotes: {},
         notes: "",
       };

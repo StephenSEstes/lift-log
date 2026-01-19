@@ -206,6 +206,14 @@ export default function ExerciseExecutionPage() {
 
   const totalSets = exercise?.plannedSets ?? 0;
   const setNumber = state?.currentSetIndex ?? 1;
+  const draftKey = useMemo(() => {
+    if (!exercise) return "";
+    return `${exercise.exercise_id}-${setNumber}`;
+  }, [exercise, setNumber]);
+  const draftSet = useMemo(() => {
+    if (!state?.draftSets || !draftKey) return null;
+    return state.draftSets[draftKey] ?? null;
+  }, [state?.draftSets, draftKey]);
 
   // Guard routing when state/exercise missing
   useEffect(() => {
@@ -349,15 +357,22 @@ export default function ExerciseExecutionPage() {
 
     if (editingSetId) return;
 
-    if ((requiresWeight && weight) || reps) return;
+    const hasWeight = !requiresWeight || Boolean(weight);
+    const hasReps = Boolean(reps);
+    if (hasWeight && hasReps) return;
+
+    const hasDraftWeight = requiresWeight && !weight && Boolean(draftSet?.weight);
+    if (hasDraftWeight) {
+      setWeight(draftSet?.weight ?? "");
+    }
 
     const defaultRepMin = Number(exercise.target_rep_min ?? 0);
     const defaultReps =
       Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
 
     if (defaultSet) {
-      if (requiresWeight) setWeight(defaultSet.weight ?? "");
-      setReps(defaultSet.reps ?? "");
+      if (requiresWeight && !weight && !hasDraftWeight) setWeight(defaultSet.weight ?? "");
+      if (!reps) setReps(defaultSet.reps ?? "");
       return;
     }
 
@@ -369,7 +384,25 @@ export default function ExerciseExecutionPage() {
     reps,
     requiresWeight,
     weight,
+    draftSet,
   ]);
+
+  useEffect(() => {
+    if (!state || !exercise || !draftKey || !requiresWeight) return;
+    updateState((prev) => {
+      if (!prev) return prev;
+      const currentDrafts = prev.draftSets ?? {};
+      const current = currentDrafts[draftKey] ?? {};
+      if ((current.weight ?? "") === weight) return prev;
+      return {
+        ...prev,
+        draftSets: {
+          ...currentDrafts,
+          [draftKey]: { ...current, weight },
+        },
+      };
+    });
+  }, [draftKey, exercise, requiresWeight, state, updateState, weight]);
 
   // Rest timer
   useEffect(() => {

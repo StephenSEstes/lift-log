@@ -50,6 +50,23 @@ export default function ReadyClient() {
     return state.plan[state.currentExerciseIndex] ?? null;
   }, [state, exerciseKey]);
 
+  const draftKey = useMemo(() => {
+    if (!exercise) return "";
+    const setNumber = state?.currentSetIndex ?? 1;
+    return `${exercise.exercise_id}-${setNumber}`;
+  }, [exercise, state?.currentSetIndex]);
+
+  const draftWeight = useMemo(() => {
+    if (!state?.draftSets || !draftKey) return "";
+    return state.draftSets[draftKey]?.weight ?? "";
+  }, [draftKey, state?.draftSets]);
+
+  const [readyWeight, setReadyWeight] = useState("");
+
+  useEffect(() => {
+    setReadyWeight(draftWeight);
+  }, [draftKey, draftWeight]);
+
   useEffect(() => {
     if (!state) {
       router.push("/");
@@ -190,6 +207,8 @@ export default function ReadyClient() {
   if (!state || !exercise) {
     return null;
   }
+
+  const setNumber = state.currentSetIndex ?? 1;
 
   const resolvedSessionId = sessionId || state.sessionId;
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
@@ -342,6 +361,42 @@ export default function ReadyClient() {
         </button>
         {saveMessage && <p className="muted">{saveMessage}</p>}
       </section>
+
+      {requiresWeight && (
+        <section className="card stack">
+          <h3>Target weight</h3>
+          <div className="stack" style={{ alignItems: "center" }}>
+            <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1 }}>
+              {readyWeight ? readyWeight : "--"}
+            </div>
+            <input
+              className="input input--inline"
+              type="number"
+              inputMode="decimal"
+              value={readyWeight}
+              onChange={(event) => {
+                const next = event.target.value;
+                setReadyWeight(next);
+                updateState((prev) => {
+                  if (!prev) return prev;
+                  const currentDrafts = prev.draftSets ?? {};
+                  const current = currentDrafts[draftKey] ?? {};
+                  if ((current.weight ?? "") === next) return prev;
+                  return {
+                    ...prev,
+                    draftSets: {
+                      ...currentDrafts,
+                      [draftKey]: { ...current, weight: next },
+                    },
+                  };
+                });
+              }}
+              placeholder="lbs/kg"
+            />
+            <p className="muted">Set {setNumber}</p>
+          </div>
+        </section>
+      )}
 
       <section className="card stack">
         <button className="button button--accent" onClick={handleBegin}>

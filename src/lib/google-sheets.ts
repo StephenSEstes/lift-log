@@ -16,6 +16,7 @@ export type WorkoutPlanRow = {
 export type WorkoutSetRow = {
   set_id?: string;
   session_id: string;
+  user_email?: string;
   set_timestamp: string;
   exercise_id: string;
   exercise_name: string;
@@ -157,6 +158,7 @@ export const readWorkoutSets = async (accessToken: string) => {
 
   const idxSessionId = getIndex(["sessionid"], 0);
   const idxSetTimestamp = getIndex(["settimestamp", "createdat", "set_timestamp"], 1);
+  const idxUserEmail = getIndex(["useremail", "user_email"]);
   const idxExerciseKey = getIndex(["exercisekey", "exerciseid", "exercise_id"], 2);
   const idxExerciseName = getIndex(["exercisename", "exercise_name"], 3);
   const idxExerciseOrder = getIndex(["exerciseorder", "exercise_order"], 4);
@@ -177,6 +179,7 @@ export const readWorkoutSets = async (accessToken: string) => {
     .map((row) => ({
       set_id: idxSetId >= 0 ? asString(row[idxSetId]) : undefined,
       session_id: asString(row[idxSessionId]),
+      user_email: idxUserEmail >= 0 ? asString(row[idxUserEmail]) : undefined,
       set_timestamp: asString(row[idxSetTimestamp]),
       exercise_id: asString(row[idxExerciseKey]),
       exercise_name: asString(row[idxExerciseName]),

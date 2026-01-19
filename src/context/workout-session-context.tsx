@@ -31,7 +31,11 @@ export const WorkoutSessionProvider = ({ children }: { children: ReactNode }) =>
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     try {
-      return JSON.parse(stored) as WorkoutSessionState;
+      const parsed = JSON.parse(stored) as WorkoutSessionState;
+      return {
+        ...parsed,
+        draftSets: parsed.draftSets ?? {},
+      };
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
       return null;

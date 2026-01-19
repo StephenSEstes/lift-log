@@ -23,6 +23,7 @@ export type ExerciseCatalogRow = {
 export type LoggedSet = {
   session_id: string;
   set_id?: string;
+  user_email?: string;
   set_timestamp: string;
   exercise_id: string;
   exercise_name: string;
@@ -52,6 +53,7 @@ export type WorkoutSessionState = {
   currentExerciseIndex: number;
   currentSetIndex: number;
   sets: LoggedSet[];
+  draftSets: Record<string, { weight?: string; reps?: string }>;
   exerciseNotes: Record<string, string>;
   notes: string;
 };
@@ -87,6 +89,7 @@ export const createNewSession = (planDay: string): WorkoutSessionState => ({
   currentExerciseIndex: 0,
   currentSetIndex: 1,
   sets: [],
+  draftSets: {},
   exerciseNotes: {},
   notes: "",
 });

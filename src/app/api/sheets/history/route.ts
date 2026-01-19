@@ -25,9 +25,12 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const exerciseId = (searchParams.get("exerciseId") ?? "").toLowerCase();
   const exerciseName = (searchParams.get("exerciseName") ?? "").toLowerCase();
+  const userEmail = (session.user?.email ?? "").toLowerCase();
   const sets = await readWorkoutSets(session.accessToken);
 
   const matching = sets.filter((set) => {
+    const setUserEmail = (set.user_email ?? "").toLowerCase();
+    if (userEmail && setUserEmail && setUserEmail !== userEmail) return false;
     if (exerciseId && set.exercise_id.toLowerCase() === exerciseId) return true;
     if (exerciseName && set.exercise_name.toLowerCase() === exerciseName)
       return true;

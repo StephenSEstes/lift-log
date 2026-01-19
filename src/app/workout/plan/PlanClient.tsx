@@ -398,6 +398,7 @@ export default function WorkoutPlanPage() {
         currentExerciseIndex: 0,
         currentSetIndex: 1,
         sets: [],
+        draftSets: {},
         exerciseNotes: {},
         notes: "",
       };
