@@ -882,13 +882,19 @@ export default function ExerciseExecutionPage() {
             <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
             {requiresWeight && (
               <div className="stack" style={{ alignItems: "center" }}>
+                <label
+                  className="text-lg font-medium"
+                  htmlFor="rest-weight-input"
+                >
+                  Load Weight to:
+                </label>
                 <input
-                  className="input input--inline text-2xl font-semibold"
+                  className="input input--inline text-3xl font-semibold"
                   type="number"
                   inputMode="decimal"
                   value={weight}
                   onChange={(event) => setWeight(event.target.value)}
-                  aria-label="Weight"
+                  id="rest-weight-input"
                 />
               </div>
             )}
@@ -908,13 +914,19 @@ export default function ExerciseExecutionPage() {
           {requiresWeight && (
             <div className="row spaced" style={{ alignItems: "baseline" }}>
               <div>
+                <label
+                  className="text-lg font-medium"
+                  htmlFor="exercise-weight-input"
+                >
+                  Load Weight to:
+                </label>
                 <input
-                  className="input input--inline text-2xl font-semibold"
+                  className="input input--inline text-3xl font-semibold"
                   type="number"
                   inputMode="decimal"
                   value={weight}
                   onChange={(event) => setWeight(event.target.value)}
-                  aria-label="Weight"
+                  id="exercise-weight-input"
                   style={{ maxWidth: 190 }}
                 />
               </div>
