@@ -853,8 +853,6 @@ export default function ExerciseExecutionPage() {
 
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = sessionSets.length + 1;
-  const weightDisplay = weight ? weight : "--";
-
   return (
     <main className="page pb-24 md:pb-28">
       <header className="page__header">
@@ -884,17 +882,13 @@ export default function ExerciseExecutionPage() {
             <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
             {requiresWeight && (
               <div className="stack" style={{ alignItems: "center" }}>
-                <span className="muted">Target weight</span>
-                <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1 }}>
-                  {weightDisplay}
-                </div>
                 <input
-                  className="input input--inline"
+                  className="input input--inline text-2xl font-semibold"
                   type="number"
                   inputMode="decimal"
                   value={weight}
                   onChange={(event) => setWeight(event.target.value)}
-                  placeholder="lbs/kg"
+                  aria-label="Weight"
                 />
               </div>
             )}
@@ -914,15 +908,13 @@ export default function ExerciseExecutionPage() {
           {requiresWeight && (
             <div className="row spaced" style={{ alignItems: "baseline" }}>
               <div>
-                <label className="muted">Weight</label>
-                <div style={{ fontSize: "1.6rem", fontWeight: 600 }}>{weightDisplay}</div>
                 <input
-                  className="input input--inline"
+                  className="input input--inline text-2xl font-semibold"
                   type="number"
                   inputMode="decimal"
                   value={weight}
                   onChange={(event) => setWeight(event.target.value)}
-                  placeholder="lbs/kg"
+                  aria-label="Weight"
                   style={{ maxWidth: 190 }}
                 />
               </div>
