@@ -228,6 +228,60 @@ export default function ExerciseExecutionPage() {
     return sorted.find((set) => set.set_number === setNumber) ?? sorted[0] ?? null;
   }, [exercise, history, loadingHistory, sessionSets, setNumber]);
 
+  // Default inputs from latest matching set number, or latest set for the exercise, or exercise target reps.
+  useEffect(() => {
+    if (!exercise) return;
+
+    if (skipDefaultRef.current) {
+      skipDefaultRef.current = false;
+      return;
+    }
+
+    if (editingSetId) return;
+
+    if (!draftKey) return;
+
+    const appliedKey = appliedDefaultsKeyRef.current;
+    if (appliedKey === draftKey) return;
+
+    appliedDefaultsKeyRef.current = draftKey;
+
+    const hasWeight = !requiresWeight || Boolean(weight);
+    const hasReps = Boolean(reps);
+    const hasDraftWeight = requiresWeight && !weight && Boolean(draftSet?.weight);
+    const hasDraftReps = !reps && Boolean(draftSet?.reps);
+
+    if (hasDraftWeight && !hasWeight) {
+      setWeight(draftSet?.weight ?? "");
+    }
+    if (hasDraftReps && !hasReps) {
+      setReps(draftSet?.reps ?? "");
+    }
+
+    const defaultRepMin = Number(exercise.target_rep_min ?? 0);
+    const defaultReps =
+      Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
+
+    if (defaultSet) {
+      if (requiresWeight && !weight && !hasDraftWeight) {
+        setWeight(defaultSet.weight ?? "");
+      }
+      if (!reps && !hasDraftReps) setReps(defaultSet.reps ?? "");
+      return;
+    }
+
+    if (!reps && defaultReps) setReps(defaultReps);
+  }, [
+    exercise,
+    editingSetId,
+    defaultSet,
+    reps,
+    requiresWeight,
+    weight,
+    draftSet,
+    draftKey,
+  ]);
+
   // Guard routing when state/exercise missing
   useEffect(() => {
     if (!state) return;
@@ -358,60 +412,6 @@ export default function ExerciseExecutionPage() {
     setRequiresWeight(resolvedRequiresWeight);
     if (!resolvedRequiresWeight) setWeight("");
   }, [exerciseSetup]);
-
-  // Default inputs from latest matching set number, or latest set for the exercise, or exercise target reps.
-  useEffect(() => {
-    if (!exercise) return;
-
-    if (skipDefaultRef.current) {
-      skipDefaultRef.current = false;
-      return;
-    }
-
-    if (editingSetId) return;
-
-    if (!draftKey) return;
-
-    const appliedKey = appliedDefaultsKeyRef.current;
-    if (appliedKey === draftKey) return;
-
-    appliedDefaultsKeyRef.current = draftKey;
-
-    const hasWeight = !requiresWeight || Boolean(weight);
-    const hasReps = Boolean(reps);
-    const hasDraftWeight = requiresWeight && !weight && Boolean(draftSet?.weight);
-    const hasDraftReps = !reps && Boolean(draftSet?.reps);
-
-    if (hasDraftWeight && !hasWeight) {
-      setWeight(draftSet?.weight ?? "");
-    }
-    if (hasDraftReps && !hasReps) {
-      setReps(draftSet?.reps ?? "");
-    }
-
-    const defaultRepMin = Number(exercise.target_rep_min ?? 0);
-    const defaultReps =
-      Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
-
-    if (defaultSet) {
-      if (requiresWeight && !weight && !hasDraftWeight) {
-        setWeight(defaultSet.weight ?? "");
-      }
-      if (!reps && !hasDraftReps) setReps(defaultSet.reps ?? "");
-      return;
-    }
-
-    if (!reps && defaultReps) setReps(defaultReps);
-  }, [
-    exercise,
-    editingSetId,
-    defaultSet,
-    reps,
-    requiresWeight,
-    weight,
-    draftSet,
-    draftKey,
-  ]);
 
   useEffect(() => {
     if (!state || !exercise || !draftKey || !requiresWeight) return;
