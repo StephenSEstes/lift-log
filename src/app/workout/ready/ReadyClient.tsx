@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
-import type { ExerciseCatalogRow } from "@/lib/workout";
+import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
 
 type ExerciseSetupRow = {
   setupId: string;
@@ -17,6 +17,12 @@ type ExerciseSetupRow = {
   updatedAt: string;
 };
 
+type HistoryResponse = {
+  lastSessionDate: string | null;
+  sets: LoggedSet[];
+  recentSets?: LoggedSet[];
+};
+
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error) return error.message;
   return fallback;
@@ -28,6 +34,8 @@ export default function ReadyClient() {
   const { state, updateState } = useWorkoutSession();
   const [exerciseSetup, setExerciseSetup] = useState<ExerciseSetupRow | null>(null);
   const [catalogRow, setCatalogRow] = useState<ExerciseCatalogRow | null>(null);
+  const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [defaultRestSeconds, setDefaultRestSeconds] = useState("");
   const [setupNotes, setSetupNotes] = useState("");
   const [requiresWeight, setRequiresWeight] = useState(true);
@@ -61,11 +69,27 @@ export default function ReadyClient() {
     return state.draftSets[draftKey]?.weight ?? "";
   }, [draftKey, state?.draftSets]);
 
+  const setNumber = state?.currentSetIndex ?? 1;
+
+  const defaultWeight = useMemo(() => {
+    if (!exercise) return "";
+    if (draftWeight) return draftWeight;
+    if (loadingHistory) return "";
+    const historySets = history?.recentSets ?? history?.sets ?? [];
+    const usable = historySets.filter((set) => set.is_skipped !== "TRUE");
+    if (!usable.length) return "";
+    const sorted = [...usable].sort((a, b) =>
+      b.set_timestamp.localeCompare(a.set_timestamp)
+    );
+    const match = sorted.find((set) => set.set_number === setNumber);
+    return match?.weight ?? sorted[0]?.weight ?? "";
+  }, [draftWeight, exercise, history, loadingHistory, setNumber]);
+
   const [readyWeight, setReadyWeight] = useState("");
 
   useEffect(() => {
-    setReadyWeight(draftWeight);
-  }, [draftKey, draftWeight]);
+    setReadyWeight(defaultWeight);
+  }, [defaultWeight, draftKey]);
 
   useEffect(() => {
     if (!state) {
@@ -110,6 +134,29 @@ export default function ReadyClient() {
     setCatalogRow(null);
     setExerciseSetup(null);
   }, [exercise?.exercise_id]);
+
+  useEffect(() => {
+    if (!exercise) return;
+
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      try {
+        const response = await fetch(
+          `/api/sheets/history?exerciseId=${encodeURIComponent(
+            exercise.exercise_id
+          )}&exerciseName=${encodeURIComponent(exercise.exercise_name)}`
+        );
+        const data = (await response.json()) as HistoryResponse;
+        setHistory(data);
+      } catch {
+        setHistory(null);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
+  }, [exercise]);
 
   useEffect(() => {
     const exerciseId = exercise?.exercise_id;
@@ -207,8 +254,6 @@ export default function ReadyClient() {
   if (!state || !exercise) {
     return null;
   }
-
-  const setNumber = state.currentSetIndex ?? 1;
 
   const resolvedSessionId = sessionId || state.sessionId;
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
