@@ -241,21 +241,27 @@ export default function ExerciseExecutionPage() {
 
     if (!draftKey) return;
 
+    const draftWeight = requiresWeight ? (draftSet?.weight ?? "") : "";
+    const draftReps = draftSet?.reps ?? "";
+    const hasDraft = Boolean(draftWeight) || Boolean(draftReps);
+
+    if (loadingHistory && !hasDraft) return;
+
     const appliedKey = appliedDefaultsKeyRef.current;
     if (appliedKey === draftKey) return;
 
-    appliedDefaultsKeyRef.current = draftKey;
-
     const hasWeight = !requiresWeight || Boolean(weight);
     const hasReps = Boolean(reps);
-    const hasDraftWeight = requiresWeight && !weight && Boolean(draftSet?.weight);
-    const hasDraftReps = !reps && Boolean(draftSet?.reps);
+    const hasDraftWeight = requiresWeight && !weight && Boolean(draftWeight);
+    const hasDraftReps = !reps && Boolean(draftReps);
 
     if (hasDraftWeight && !hasWeight) {
-      setWeight(draftSet?.weight ?? "");
+      appliedDefaultsKeyRef.current = draftKey;
+      setWeight(draftWeight);
     }
     if (hasDraftReps && !hasReps) {
-      setReps(draftSet?.reps ?? "");
+      appliedDefaultsKeyRef.current = draftKey;
+      setReps(draftReps);
     }
 
     const defaultRepMin = Number(exercise.target_rep_min ?? 0);
@@ -264,13 +270,20 @@ export default function ExerciseExecutionPage() {
 
     if (defaultSet) {
       if (requiresWeight && !weight && !hasDraftWeight) {
+        appliedDefaultsKeyRef.current = draftKey;
         setWeight(defaultSet.weight ?? "");
       }
-      if (!reps && !hasDraftReps) setReps(defaultSet.reps ?? "");
+      if (!reps && !hasDraftReps) {
+        appliedDefaultsKeyRef.current = draftKey;
+        setReps(defaultSet.reps ?? "");
+      }
       return;
     }
 
-    if (!reps && defaultReps) setReps(defaultReps);
+    if (!reps && defaultReps) {
+      appliedDefaultsKeyRef.current = draftKey;
+      setReps(defaultReps);
+    }
   }, [
     exercise,
     editingSetId,
