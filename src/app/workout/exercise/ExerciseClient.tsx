@@ -104,6 +104,7 @@ export default function ExerciseExecutionPage() {
   const lastRestSecondsRef = useRef(0);
   const skipDefaultRef = useRef(false);
   const appliedTargetRef = useRef(false);
+  const appliedDefaultsKeyRef = useRef<string | null>(null);
 
   const exerciseKeyParam = (searchParams.get("exerciseKey") ?? "").trim();
   const sessionIdParam = (searchParams.get("sessionId") ?? "").trim();
@@ -369,13 +370,23 @@ export default function ExerciseExecutionPage() {
 
     if (editingSetId) return;
 
+    if (!draftKey) return;
+
+    const appliedKey = appliedDefaultsKeyRef.current;
+    if (appliedKey === draftKey) return;
+
+    appliedDefaultsKeyRef.current = draftKey;
+
     const hasWeight = !requiresWeight || Boolean(weight);
     const hasReps = Boolean(reps);
-    if (hasWeight && hasReps) return;
-
     const hasDraftWeight = requiresWeight && !weight && Boolean(draftSet?.weight);
-    if (hasDraftWeight) {
+    const hasDraftReps = !reps && Boolean(draftSet?.reps);
+
+    if (hasDraftWeight && !hasWeight) {
       setWeight(draftSet?.weight ?? "");
+    }
+    if (hasDraftReps && !hasReps) {
+      setReps(draftSet?.reps ?? "");
     }
 
     const defaultRepMin = Number(exercise.target_rep_min ?? 0);
@@ -383,8 +394,10 @@ export default function ExerciseExecutionPage() {
       Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
 
     if (defaultSet) {
-      if (requiresWeight && !weight && !hasDraftWeight) setWeight(defaultSet.weight ?? "");
-      if (!reps) setReps(defaultSet.reps ?? "");
+      if (requiresWeight && !weight && !hasDraftWeight) {
+        setWeight(defaultSet.weight ?? "");
+      }
+      if (!reps && !hasDraftReps) setReps(defaultSet.reps ?? "");
       return;
     }
 
@@ -397,6 +410,7 @@ export default function ExerciseExecutionPage() {
     requiresWeight,
     weight,
     draftSet,
+    draftKey,
   ]);
 
   useEffect(() => {
@@ -889,6 +903,15 @@ export default function ExerciseExecutionPage() {
               <div>
                 <label className="muted">Weight</label>
                 <div style={{ fontSize: "1.6rem", fontWeight: 600 }}>{weightDisplay}</div>
+                <input
+                  className="input input--inline"
+                  type="number"
+                  inputMode="decimal"
+                  value={weight}
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="lbs/kg"
+                  style={{ maxWidth: 190 }}
+                />
               </div>
               <span className="muted" style={{ fontSize: "0.9rem" }}>
                 Adjust during rest
