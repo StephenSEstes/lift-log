@@ -246,19 +246,16 @@ export default function FinishPage() {
     return [...seen.values()].sort((a, b) => a.exerciseOrder - b.exerciseOrder);
   }, [state]);
 
+  const shouldLoadHistory = Boolean(session) && performedExercises.length > 0;
+
   useEffect(() => {
-    if (!session || performedExercises.length === 0) {
-      setHistoryByExercise({});
-      setLoadingHistory(false);
-      return;
-    }
+    if (!shouldLoadHistory) return;
 
     const controller = new AbortController();
     let cancelled = false;
 
-    setLoadingHistory(true);
-
     (async () => {
+      setLoadingHistory(true);
       const results = await Promise.all(
         performedExercises.map(async (exercise) => {
           try {
@@ -297,7 +294,7 @@ export default function FinishPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [session, performedExercises]);
+  }, [performedExercises, shouldLoadHistory]);
 
   if (!state) {
     return (
@@ -356,7 +353,9 @@ export default function FinishPage() {
       )}
 
       {performedExercises.map((exercise) => {
-        const history = historyByExercise[exercise.exerciseId] ?? null;
+        const effectiveHistoryByExercise = shouldLoadHistory ? historyByExercise : {};
+        const effectiveLoadingHistory = shouldLoadHistory ? loadingHistory : false;
+        const history = effectiveHistoryByExercise[exercise.exerciseId] ?? null;
         const historySets = history?.recentSets ?? history?.sets ?? [];
         const prValues = computePrValues(historySets);
         const sparklineValues = getBestWeightTimesRepsBySession(
@@ -385,7 +384,7 @@ export default function FinishPage() {
           <section className="card stack" key={exercise.exerciseId}>
             <div className="row spaced">
               <h3>{exercise.exerciseName}</h3>
-              {loadingHistory && <span className="muted">Loading...</span>}
+              {effectiveLoadingHistory && <span className="muted">Loading...</span>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -408,7 +407,7 @@ export default function FinishPage() {
 
               <div className="stack md:col-span-2">
                 <span className="muted">Best Weight × Reps (recent sessions)</span>
-                {loadingHistory ? (
+                {effectiveLoadingHistory ? (
                   <p className="muted">Loading history...</p>
                 ) : sparklineValues.length > 0 ? (
                   <>
