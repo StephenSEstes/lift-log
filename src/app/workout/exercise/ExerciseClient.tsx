@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
@@ -91,7 +91,9 @@ export default function ExerciseExecutionPage() {
 
   const [requiresWeight, setRequiresWeight] = useState(true);
 
-  const [isResting, setIsResting] = useState(false);
+  const [mode, setMode] = useState<"active" | "rest">("active");
+  const [restEndsAtMs, setRestEndsAtMs] = useState<number | null>(null);
+  const [restNextSetNumber, setRestNextSetNumber] = useState<number | null>(null);
   const [restSeconds, setRestSeconds] = useState(0);
   const [restTargetSeconds, setRestTargetSeconds] = useState(60);
 
@@ -249,6 +251,33 @@ export default function ExerciseExecutionPage() {
     const first = recentSets.find((set) => set.is_skipped !== "TRUE");
     return first?.weight ?? "";
   }, [activeSetNumber, draftSet, recentSets]);
+
+  const pickSuggestedWeightForSet = useCallback(
+    (setNo: number): string => {
+      if (!exercise) return "";
+      const key = `${exercise.exercise_id}::${setNo}`;
+      const draft = state?.draftSets?.[key]?.weight;
+    if (draft !== undefined && draft !== null && `${draft}`.trim() !== "") {
+      return `${draft}`;
+    }
+
+    const sameSet = recentSets.find(
+      (set) =>
+        Number(set.set_number) === setNo &&
+        set.weight != null &&
+        `${set.weight}`.trim() !== ""
+    );
+    if (sameSet?.weight != null) return `${sameSet.weight}`;
+
+    const anySet = recentSets.find(
+      (set) => set.weight != null && `${set.weight}`.trim() !== ""
+    );
+    if (anySet?.weight != null) return `${anySet.weight}`;
+
+      return "";
+    },
+    [exercise, recentSets, state?.draftSets]
+  );
 
   useEffect(() => {
     if (!draftKey || editingSetId) return;
@@ -523,34 +552,29 @@ export default function ExerciseExecutionPage() {
 
   // Rest timer
   useEffect(() => {
-    if (!isResting) return;
+    if (mode !== "rest" || !restEndsAtMs) return;
 
     restBeepedRef.current = false;
 
-    const start = Date.now();
-    if (restStartRef.current == null) restStartRef.current = start;
+    const targetSeconds = restTargetRef.current ?? 60;
+    const tick = () => {
+      const remaining = Math.max(
+        Math.ceil((restEndsAtMs - Date.now()) / 1000),
+        0
+      );
+      setRestSeconds(remaining);
 
-    const initialTarget = restTargetRef.current ?? 60;
-    setRestSeconds(initialTarget);
-
-    const id = window.setInterval(() => {
-      const startEpoch = restStartRef.current ?? start;
-      const elapsed = Math.floor((Date.now() - startEpoch) / 1000);
-
-      const targetSeconds = restTargetRef.current ?? 60;
-      const remaining = Math.max(targetSeconds - elapsed, 0);
-      const overtime = Math.max(elapsed - targetSeconds, 0);
-
-      setRestSeconds(remaining > 0 ? remaining : overtime);
-
-      if (!restBeepedRef.current && elapsed >= targetSeconds) {
+      if (!restBeepedRef.current && remaining <= 0) {
         restBeepedRef.current = true;
         playBeep();
       }
-    }, 1000);
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
 
     return () => window.clearInterval(id);
-  }, [isResting]);
+  }, [mode, restEndsAtMs]);
 
   const resetInputs = () => {
     setWeight("");
@@ -654,10 +678,15 @@ export default function ExerciseExecutionPage() {
 
       if (activeSetNumber < totalSets) {
         const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
+        const nextSet = Math.min(totalSets, activeSetNumber + 1);
         setRestTargetSeconds(nextTarget);
         restTargetRef.current = nextTarget;
-        setRestSeconds(0);
-        setIsResting(true);
+        setRestNextSetNumber(nextSet);
+        setRestEndsAtMs(Date.now() + nextTarget * 1000);
+        restStartRef.current = Date.now();
+        setRestSeconds(nextTarget);
+        setMode("rest");
+        // Note: rest overlay replaces any dedicated rest route navigation (if previously used).
       } else {
         const nextExercise = state.plan[state.currentExerciseIndex + 1];
         if (nextExercise) {
@@ -775,10 +804,15 @@ export default function ExerciseExecutionPage() {
     if (activeSetNumber < totalSets) {
       const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
       const resolved = Number.isFinite(nextTarget) ? Math.max(0, nextTarget) : 120;
+      const nextSet = Math.min(totalSets, activeSetNumber + 1);
       setRestTargetSeconds(resolved);
       restTargetRef.current = resolved;
-      setRestSeconds(0);
-      setIsResting(true);
+      setRestNextSetNumber(nextSet);
+      setRestEndsAtMs(Date.now() + resolved * 1000);
+      restStartRef.current = Date.now();
+      setRestSeconds(resolved);
+      setMode("rest");
+      // Note: rest overlay replaces any dedicated rest route navigation (if previously used).
     } else {
       const nextExercise = state.plan[state.currentExerciseIndex + 1];
       if (nextExercise) {
@@ -838,10 +872,12 @@ export default function ExerciseExecutionPage() {
       console.warn("Failed to update rest values in Sheets", err);
     }
 
-    // Reset rest state
-    setIsResting(false);
-    setRestSeconds(0);
-    restStartRef.current = null;
+  // Reset rest state
+  setMode("active");
+  setRestEndsAtMs(null);
+  setRestNextSetNumber(null);
+  setRestSeconds(0);
+  restStartRef.current = null;
 
     // Clear selection state after rest
     setEditingSetId(null);
@@ -942,7 +978,15 @@ export default function ExerciseExecutionPage() {
   }, [recentSets, showDebug]);
 
   const rpeDisplay = rpe.toFixed(1);
-  const nextSetNumber = sessionSets.length + 1;
+  const nextSetNumber = activeSetNumber;
+  const overlaySetNumber = restNextSetNumber ?? activeSetNumber;
+  const overlayDraftKey = exercise ? `${exercise.exercise_id}::${overlaySetNumber}` : "";
+  const overlayWeightValue = useMemo(() => {
+    if (!exercise) return "";
+    const draftValue = state?.draftSets?.[overlayDraftKey]?.weight ?? "";
+    if (draftValue) return `${draftValue}`;
+    return pickSuggestedWeightForSet(overlaySetNumber);
+  }, [exercise, overlayDraftKey, overlaySetNumber, pickSuggestedWeightForSet, state?.draftSets]);
   return (
     <main className="page pb-24 md:pb-28">
       <header className="page__header">
@@ -955,37 +999,50 @@ export default function ExerciseExecutionPage() {
         {targetHelper && <p className="muted">{targetHelper}</p>}
       </header>
 
-      {isResting && (
-        <section className="card stack">
-          <h3>Rest</h3>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div style={{ fontSize: "5rem", fontWeight: 700, lineHeight: 1 }}>
-              {restBeepedRef.current ? `+${formatElapsed(restSeconds)}` : formatElapsed(restSeconds)}
+      {mode === "rest" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <section className="card stack" style={{ maxWidth: 520, width: "100%" }}>
+            <span className="eyebrow">Rest</span>
+            <h2 className="title" style={{ fontSize: "2.4rem" }}>
+              Get ready for Set {overlaySetNumber}
+            </h2>
+            <div className="stack" style={{ alignItems: "center" }}>
+              <div style={{ fontSize: "4rem", fontWeight: 700, lineHeight: 1 }}>
+                {formatElapsed(restSeconds)}
+              </div>
+              <p className="muted">Remaining</p>
             </div>
-            <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
             {requiresWeight && (
               <InlineBigNumberInput
                 label="Weight to Load"
-                value={weight}
-                onChange={setWeight}
+                value={overlayWeightValue}
+                onChange={(next) => {
+                  if (!overlayDraftKey) return;
+                  updateState((prev) => {
+                    if (!prev) return prev;
+                    const currentDrafts = prev.draftSets ?? {};
+                    const current = currentDrafts[overlayDraftKey] ?? {};
+                    if ((current.weight ?? "") === next) return prev;
+                    return {
+                      ...prev,
+                      draftSets: {
+                        ...currentDrafts,
+                        [overlayDraftKey]: { ...current, weight: next },
+                      },
+                    };
+                  });
+                }}
                 className="items-center"
               />
             )}
             <button className="button button--accent" onClick={handleEndRest}>
               Begin Next Set
             </button>
-          </div>
-        </section>
+          </section>
+        </div>
       )}
 
-      {!isResting && (
+      {mode === "active" && (
         <section className="card stack">
           <h3>Log this set</h3>
 
