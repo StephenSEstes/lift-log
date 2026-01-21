@@ -22,7 +22,6 @@ type ExerciseSetupRow = {
 type HistoryResponse = {
   lastSessionDate: string | null;
   sets: LoggedSet[];
-  recentSets?: LoggedSet[];
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -36,7 +35,8 @@ export default function ReadyClient() {
   const { state, updateState } = useWorkoutSession();
   const [exerciseSetup, setExerciseSetup] = useState<ExerciseSetupRow | null>(null);
   const [catalogRow, setCatalogRow] = useState<ExerciseCatalogRow | null>(null);
-  const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [recentSets, setRecentSets] = useState<LoggedSet[]>([]);
+  const [lastSessionDate, setLastSessionDate] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [defaultRestSeconds, setDefaultRestSeconds] = useState("");
   const [setupNotes, setSetupNotes] = useState("");
@@ -91,25 +91,23 @@ export default function ReadyClient() {
     return state.draftSets[draftKey]?.weight ?? "";
   }, [draftKey, state?.draftSets]);
 
-  const defaultWeight = useMemo(() => {
+  const suggestedWeight = useMemo(() => {
     if (!exercise) return "";
     if (draftWeight) return draftWeight;
     if (loadingHistory) return "";
-    const historySets = history?.recentSets ?? history?.sets ?? [];
-    const usable = historySets.filter((set) => set.is_skipped !== "TRUE");
+    const usable = recentSets.filter((set) => set.is_skipped !== "TRUE");
     if (!usable.length) return "";
-    const sorted = [...usable].sort((a, b) =>
-      b.set_timestamp.localeCompare(a.set_timestamp)
+    const match = usable.find(
+      (set) => Number(set.set_number) === activeSetNumber
     );
-    const match = sorted.find((set) => set.set_number === activeSetNumber);
-    return match?.weight ?? sorted[0]?.weight ?? "";
-  }, [activeSetNumber, draftWeight, exercise, history, loadingHistory]);
+    return match?.weight ?? usable[0]?.weight ?? "";
+  }, [activeSetNumber, draftWeight, exercise, loadingHistory, recentSets]);
 
   const [readyWeight, setReadyWeight] = useState("");
 
   useEffect(() => {
-    setReadyWeight(defaultWeight);
-  }, [defaultWeight, draftKey]);
+    setReadyWeight(suggestedWeight);
+  }, [draftKey, suggestedWeight]);
 
   useEffect(() => {
     if (!state) {
@@ -158,25 +156,46 @@ export default function ReadyClient() {
   useEffect(() => {
     if (!exercise) return;
 
+    const controller = new AbortController();
+    let cancelled = false;
+    const excludeSessionId = state?.sessionId || sessionId || "";
+
     const loadHistory = async () => {
       setLoadingHistory(true);
       try {
         const response = await fetch(
-          `/api/sheets/history?exerciseId=${encodeURIComponent(
+          `/api/history?exerciseKey=${encodeURIComponent(
             exercise.exercise_id
-          )}&exerciseName=${encodeURIComponent(exercise.exercise_name)}`
+          )}&excludeSessionId=${encodeURIComponent(excludeSessionId)}`,
+          { signal: controller.signal }
         );
-        const data = (await response.json()) as HistoryResponse;
-        setHistory(data);
-      } catch {
-        setHistory(null);
+        const data = (await response.json().catch(() => null)) as HistoryResponse | null;
+        if (cancelled) return;
+        if (!response.ok) {
+          setRecentSets([]);
+          setLastSessionDate(null);
+          return;
+        }
+        setRecentSets(data?.sets ?? []);
+        setLastSessionDate(data?.lastSessionDate ?? null);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (!cancelled) {
+          setRecentSets([]);
+          setLastSessionDate(null);
+        }
       } finally {
-        setLoadingHistory(false);
+        if (!cancelled) setLoadingHistory(false);
       }
     };
 
     loadHistory();
-  }, [exercise]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [exercise, sessionId, state?.sessionId]);
 
   useEffect(() => {
     const exerciseId = exercise?.exercise_id;

@@ -11,7 +11,6 @@ import InlineBigNumberInput from "@/components/InlineBigNumberInput";
 type HistoryResponse = {
   lastSessionDate: string | null;
   sets: LoggedSet[];
-  recentSets?: LoggedSet[];
 };
 
 type ExerciseSetupRow = {
@@ -76,7 +75,8 @@ export default function ExerciseExecutionPage() {
   const searchParams = useSearchParams();
   const { state, updateState } = useWorkoutSession();
 
-  const [history, setHistory] = useState<HistoryResponse | null>(null);
+  const [recentSets, setRecentSets] = useState<LoggedSet[]>([]);
+  const [lastSessionDate, setLastSessionDate] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   const [exerciseSetup, setExerciseSetup] = useState<ExerciseSetupRow | null>(null);
@@ -229,18 +229,26 @@ export default function ExerciseExecutionPage() {
   }, [state?.draftSets, draftKey]);
   const defaultSet = useMemo(() => {
     if (!exercise) return null;
-    const historySets = loadingHistory ? [] : history?.recentSets ?? history?.sets ?? [];
-    const candidates = [...sessionSets, ...historySets].filter(
-      (set) => set.is_skipped !== "TRUE"
-    );
+    const candidates = recentSets.filter((set) => set.is_skipped !== "TRUE");
     if (!candidates.length) return null;
-    const sorted = [...candidates].sort((a, b) =>
-      b.set_timestamp.localeCompare(a.set_timestamp)
-    );
     return (
-      sorted.find((set) => set.set_number === activeSetNumber) ?? sorted[0] ?? null
+      candidates.find((set) => Number(set.set_number) === activeSetNumber) ??
+      candidates[0] ??
+      null
     );
-  }, [activeSetNumber, exercise, history, loadingHistory, sessionSets]);
+  }, [activeSetNumber, exercise, recentSets]);
+
+  const suggestedWeight = useMemo(() => {
+    const draftWeight = draftSet?.weight ?? "";
+    if (draftWeight) return draftWeight;
+    const match = recentSets.find(
+      (set) =>
+        set.is_skipped !== "TRUE" && Number(set.set_number) === activeSetNumber
+    );
+    if (match?.weight) return match.weight ?? "";
+    const first = recentSets.find((set) => set.is_skipped !== "TRUE");
+    return first?.weight ?? "";
+  }, [activeSetNumber, draftSet, recentSets]);
 
   useEffect(() => {
     if (!draftKey || editingSetId) return;
@@ -289,6 +297,11 @@ export default function ExerciseExecutionPage() {
       setReps(draftReps);
     }
 
+    if (requiresWeight && !weight && !hasDraftWeight && suggestedWeight) {
+      appliedDefaultsKeyRef.current = draftKey;
+      setWeight(suggestedWeight);
+    }
+
     const defaultRepMin = Number(exercise.target_rep_min ?? 0);
     const defaultReps =
       Number.isFinite(defaultRepMin) && defaultRepMin > 0 ? String(defaultRepMin) : "";
@@ -319,6 +332,7 @@ export default function ExerciseExecutionPage() {
     draftSet,
     draftKey,
     loadingHistory,
+    suggestedWeight,
   ]);
 
   // Guard routing when state/exercise missing
@@ -335,25 +349,46 @@ export default function ExerciseExecutionPage() {
   useEffect(() => {
     if (!exercise) return;
 
+    const controller = new AbortController();
+    let cancelled = false;
+    const excludeSessionId = state?.sessionId || sessionIdParam || "";
+
     const loadHistory = async () => {
       setLoadingHistory(true);
       try {
         const response = await fetch(
-          `/api/sheets/history?exerciseId=${encodeURIComponent(
+          `/api/history?exerciseKey=${encodeURIComponent(
             exercise.exercise_id
-          )}&exerciseName=${encodeURIComponent(exercise.exercise_name)}`
+          )}&excludeSessionId=${encodeURIComponent(excludeSessionId)}`,
+          { signal: controller.signal }
         );
-        const data = (await response.json()) as HistoryResponse;
-        setHistory(data);
-      } catch {
-        setHistory(null);
+        const data = (await response.json().catch(() => null)) as HistoryResponse | null;
+        if (cancelled) return;
+        if (!response.ok) {
+          setRecentSets([]);
+          setLastSessionDate(null);
+          return;
+        }
+        setRecentSets(data?.sets ?? []);
+        setLastSessionDate(data?.lastSessionDate ?? null);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (!cancelled) {
+          setRecentSets([]);
+          setLastSessionDate(null);
+        }
       } finally {
-        setLoadingHistory(false);
+        if (!cancelled) setLoadingHistory(false);
       }
     };
 
     loadHistory();
-  }, [exercise]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [exercise, sessionIdParam, state?.sessionId]);
 
   // Load exercise setup (per user/exercise)
   useEffect(() => {
@@ -815,15 +850,16 @@ export default function ExerciseExecutionPage() {
   };
 
   const lastRpeValue = useMemo(() => {
-    if (!history?.sets?.length) return "";
-    const match = [...history.sets].reverse().find((set) => (set.rpe ?? "").toString().trim() !== "");
+    if (!recentSets.length) return "";
+    const match = [...recentSets]
+      .reverse()
+      .find((set) => (set.rpe ?? "").toString().trim() !== "");
     return match?.rpe?.toString() ?? "";
-  }, [history]);
+  }, [recentSets]);
 
   const prValues = useMemo(() => {
-    const all = history?.recentSets ?? history?.sets ?? [];
-    return computePrValues(all);
-  }, [history]);
+    return computePrValues(recentSets);
+  }, [recentSets]);
 
   const targetHelper = useMemo(() => {
     if (!targetSetParam) return "";
@@ -890,9 +926,20 @@ export default function ExerciseExecutionPage() {
     : "/workout/plan";
 
   const lastSessionLabel =
-    history?.lastSessionDate && isValidDateValue(history.lastSessionDate)
-      ? new Date(history.lastSessionDate).toLocaleDateString()
+    lastSessionDate && isValidDateValue(lastSessionDate)
+      ? new Date(lastSessionDate).toLocaleDateString()
       : "";
+
+  const showDebug = (searchParams.get("debug") ?? "").trim() === "1";
+  const debugHistoryLine = useMemo(() => {
+    if (!showDebug) return "";
+    const first = recentSets[0];
+    const firstSetNumber = first ? Number(first.set_number || 0) : 0;
+    const firstWeight = first?.weight ?? "-";
+    return `History: ${recentSets.length} sets (first: set ${
+      firstSetNumber || "-"
+    } @ ${firstWeight || "-"})`;
+  }, [recentSets, showDebug]);
 
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = sessionSets.length + 1;
@@ -1082,11 +1129,11 @@ export default function ExerciseExecutionPage() {
 
             {loadingHistory && <p className="muted">Loading history...</p>}
 
-            {!loadingHistory && (!history || history.sets.length === 0) && (
+            {!loadingHistory && recentSets.length === 0 && (
               <p className="muted">No history yet.</p>
             )}
 
-            {!loadingHistory && history && (
+            {!loadingHistory && recentSets.length > 0 && (
               <div className="stack">
                 <div className="row spaced">
                   <span className="muted">Most recent</span>
@@ -1105,9 +1152,9 @@ export default function ExerciseExecutionPage() {
 
                 {lastRpeValue && <p className="muted">Last RPE: {lastRpeValue}</p>}
 
-                {history.sets && history.sets.length > 0 && (
+                {recentSets.length > 0 && (
                   <div className="stack">
-                    {history.sets.map((set) => (
+                    {recentSets.map((set) => (
                       <div className="row spaced" key={`${set.session_id}-${set.set_number}`}>
                         <span>Set {set.set_number}</span>
                         <span className="muted">
@@ -1119,6 +1166,7 @@ export default function ExerciseExecutionPage() {
                     ))}
                   </div>
                 )}
+                {debugHistoryLine && <p className="muted">{debugHistoryLine}</p>}
               </div>
             )}
           </div>
