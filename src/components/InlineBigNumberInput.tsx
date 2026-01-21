@@ -27,19 +27,21 @@ export default function InlineBigNumberInput({
     }
   }, [isEditing]);
 
-  const displayValue = value ? value : "--";
-  const containerClassName = className ? `stack ${className}` : "stack";
+  const displayValue = value && value.trim() ? value : "Tap to set";
+  const containerClassName = className
+    ? `stack ${className}`
+    : "stack items-center";
 
   return (
     <div className={containerClassName}>
-      <label className="text-lg font-medium" htmlFor={inputId}>
+      <label className="text-sm font-medium" htmlFor={inputId}>
         {label}
       </label>
       {isEditing && !disabled ? (
         <input
           ref={inputRef}
           id={inputId}
-          className="input input--inline text-3xl font-semibold"
+          className="input text-5xl font-semibold text-center w-[160px]"
           type="number"
           inputMode="decimal"
           value={value}
@@ -55,7 +57,7 @@ export default function InlineBigNumberInput({
       ) : (
         <button
           type="button"
-          className="text-3xl font-semibold"
+          className="min-w-[140px] rounded-2xl border border-[var(--edge)] bg-white/70 px-4 py-2 text-5xl font-semibold text-center"
           onClick={() => {
             if (!disabled) setIsEditing(true);
           }}

@@ -990,6 +990,19 @@ export default function ExerciseExecutionPage() {
   return (
     <main className="page pb-24 md:pb-28">
       <header className="page__header">
+        <button
+          className="button button--ghost"
+          onClick={() => {
+            if (mode === "rest") {
+              setMode("active");
+              setRestEndsAtMs(null);
+              setRestNextSetNumber(null);
+            }
+            router.push(backHref);
+          }}
+        >
+          Back to workout plan
+        </button>
         <span className="eyebrow">Exercise</span>
         <h1 className="title">{displayName}</h1>
         <p className="subtitle">
