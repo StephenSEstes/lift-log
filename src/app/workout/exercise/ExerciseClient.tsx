@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
 import { computePrValues } from "@/lib/workout";
+import { computeNextSetNumber } from "@/lib/sets";
+import InlineBigNumberInput from "@/components/InlineBigNumberInput";
 
 type HistoryResponse = {
   lastSessionDate: string | null;
@@ -105,6 +107,7 @@ export default function ExerciseExecutionPage() {
   const skipDefaultRef = useRef(false);
   const appliedTargetRef = useRef(false);
   const appliedDefaultsKeyRef = useRef<string | null>(null);
+  const lastDraftKeyRef = useRef<string | null>(null);
 
   const exerciseKeyParam = (searchParams.get("exerciseKey") ?? "").trim();
   const sessionIdParam = (searchParams.get("sessionId") ?? "").trim();
@@ -206,11 +209,20 @@ export default function ExerciseExecutionPage() {
   }, [exercise, requiresWeight, sessionSets, state, targetSetParam, updateState]);
 
   const totalSets = exercise?.plannedSets ?? 0;
-  const setNumber = state?.currentSetIndex ?? 1;
+  const plannedSetCount = totalSets || 1;
+  const activeSetNumber = useMemo(() => {
+    return computeNextSetNumber({
+      plannedSetCount,
+      loggedSetsForExercise: sessionSets.map((set) => ({
+        setNumber: set.set_number,
+      })),
+    });
+  }, [plannedSetCount, sessionSets]);
+  const displaySetNumber = editingSetNumber ?? activeSetNumber;
   const draftKey = useMemo(() => {
     if (!exercise) return "";
-    return `${exercise.exercise_id}-${setNumber}`;
-  }, [exercise, setNumber]);
+    return `${exercise.exercise_id}::${activeSetNumber}`;
+  }, [exercise, activeSetNumber]);
   const draftSet = useMemo(() => {
     if (!state?.draftSets || !draftKey) return null;
     return state.draftSets[draftKey] ?? null;
@@ -225,8 +237,21 @@ export default function ExerciseExecutionPage() {
     const sorted = [...candidates].sort((a, b) =>
       b.set_timestamp.localeCompare(a.set_timestamp)
     );
-    return sorted.find((set) => set.set_number === setNumber) ?? sorted[0] ?? null;
-  }, [exercise, history, loadingHistory, sessionSets, setNumber]);
+    return (
+      sorted.find((set) => set.set_number === activeSetNumber) ?? sorted[0] ?? null
+    );
+  }, [activeSetNumber, exercise, history, loadingHistory, sessionSets]);
+
+  useEffect(() => {
+    if (!draftKey || editingSetId) return;
+    if (lastDraftKeyRef.current === draftKey) return;
+    lastDraftKeyRef.current = draftKey;
+    appliedDefaultsKeyRef.current = null;
+    setWeight("");
+    setReps("");
+    setSkipReason("");
+    setRpe(5);
+  }, [draftKey, editingSetId]);
 
   // Default inputs from latest matching set number, or latest set for the exercise, or exercise target reps.
   useEffect(() => {
@@ -293,6 +318,7 @@ export default function ExerciseExecutionPage() {
     weight,
     draftSet,
     draftKey,
+    loadingHistory,
   ]);
 
   // Guard routing when state/exercise missing
@@ -427,7 +453,7 @@ export default function ExerciseExecutionPage() {
   }, [exerciseSetup]);
 
   useEffect(() => {
-    if (!state || !exercise || !draftKey || !requiresWeight) return;
+    if (!state || !exercise || !draftKey || !requiresWeight || editingSetId) return;
     updateState((prev) => {
       if (!prev) return prev;
       const currentDrafts = prev.draftSets ?? {};
@@ -441,7 +467,24 @@ export default function ExerciseExecutionPage() {
         },
       };
     });
-  }, [draftKey, exercise, requiresWeight, state, updateState, weight]);
+  }, [draftKey, editingSetId, exercise, requiresWeight, state, updateState, weight]);
+
+  useEffect(() => {
+    if (!state || !exercise || !draftKey || editingSetId) return;
+    updateState((prev) => {
+      if (!prev) return prev;
+      const currentDrafts = prev.draftSets ?? {};
+      const current = currentDrafts[draftKey] ?? {};
+      if ((current.reps ?? "") === reps) return prev;
+      return {
+        ...prev,
+        draftSets: {
+          ...currentDrafts,
+          [draftKey]: { ...current, reps },
+        },
+      };
+    });
+  }, [draftKey, editingSetId, exercise, reps, state, updateState]);
 
   // Rest timer
   useEffect(() => {
@@ -511,7 +554,7 @@ export default function ExerciseExecutionPage() {
       exercise_name: exercise.exercise_name,
       exercise_order: exercise.sortOrder,
       set_timestamp: new Date().toISOString(),
-      set_number: setNumber,
+      set_number: activeSetNumber,
       weight: weightValue,
       reps,
       rpe,
@@ -532,7 +575,7 @@ export default function ExerciseExecutionPage() {
           sessionId: state.sessionId,
           exerciseKey: exercise.exercise_id,
           exerciseName: exercise.exercise_name,
-          setNumber,
+          setNumber: activeSetNumber,
           weight: weightValue,
           reps,
           rpe,
@@ -574,7 +617,7 @@ export default function ExerciseExecutionPage() {
 
       resetInputs();
 
-      if (setNumber < totalSets) {
+      if (activeSetNumber < totalSets) {
         const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
         setRestTargetSeconds(nextTarget);
         restTargetRef.current = nextTarget;
@@ -659,7 +702,7 @@ export default function ExerciseExecutionPage() {
       exercise_id: exercise.exercise_id,
       exercise_name: exercise.exercise_name,
       exercise_order: exercise.sortOrder,
-      set_number: setNumber,
+      set_number: activeSetNumber,
       weight: "",
       reps: "",
       is_skipped: "TRUE",
@@ -694,7 +737,7 @@ export default function ExerciseExecutionPage() {
 
     resetInputs();
 
-    if (setNumber < totalSets) {
+    if (activeSetNumber < totalSets) {
       const nextTarget = restTargetRef.current ?? restTargetSeconds ?? 60;
       const resolved = Number.isFinite(nextTarget) ? Math.max(0, nextTarget) : 120;
       setRestTargetSeconds(resolved);
@@ -859,7 +902,7 @@ export default function ExerciseExecutionPage() {
         <span className="eyebrow">Exercise</span>
         <h1 className="title">{displayName}</h1>
         <p className="subtitle">
-          Set {setNumber} of {totalSets}
+          Set {displaySetNumber} of {totalSets}
         </p>
 
         {targetHelper && <p className="muted">{targetHelper}</p>}
@@ -881,22 +924,12 @@ export default function ExerciseExecutionPage() {
             </div>
             <p className="muted">{restBeepedRef.current ? `Overtime` : `Remaining`}</p>
             {requiresWeight && (
-              <div className="stack" style={{ alignItems: "center" }}>
-                <label
-                  className="text-lg font-medium"
-                  htmlFor="rest-weight-input"
-                >
-                  Load Weight to:
-                </label>
-                <input
-                  className="input input--inline text-3xl font-semibold"
-                  type="number"
-                  inputMode="decimal"
-                  value={weight}
-                  onChange={(event) => setWeight(event.target.value)}
-                  id="rest-weight-input"
-                />
-              </div>
+              <InlineBigNumberInput
+                label="Weight to Load"
+                value={weight}
+                onChange={setWeight}
+                className="items-center"
+              />
             )}
             <button className="button button--accent" onClick={handleEndRest}>
               Begin Next Set
@@ -912,28 +945,11 @@ export default function ExerciseExecutionPage() {
           {editingSetNumber && <p className="muted">Editing: Set {editingSetNumber}</p>}
 
           {requiresWeight && (
-            <div className="row spaced" style={{ alignItems: "baseline" }}>
-              <div>
-                <label
-                  className="text-lg font-medium"
-                  htmlFor="exercise-weight-input"
-                >
-                  Load Weight to:
-                </label>
-                <input
-                  className="input input--inline text-3xl font-semibold"
-                  type="number"
-                  inputMode="decimal"
-                  value={weight}
-                  onChange={(event) => setWeight(event.target.value)}
-                  id="exercise-weight-input"
-                  style={{ maxWidth: 190 }}
-                />
-              </div>
-              <span className="muted" style={{ fontSize: "0.9rem" }}>
-                Adjust during rest
-              </span>
-            </div>
+            <InlineBigNumberInput
+              label="Weight to Load"
+              value={weight}
+              onChange={setWeight}
+            />
           )}
 
           <div className="stack" style={{ alignItems: "center" }}>

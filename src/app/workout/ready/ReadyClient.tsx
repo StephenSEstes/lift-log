@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
+import { computeNextSetNumber } from "@/lib/sets";
+import InlineBigNumberInput from "@/components/InlineBigNumberInput";
 
 type ExerciseSetupRow = {
   setupId: string;
@@ -58,18 +60,36 @@ export default function ReadyClient() {
     return state.plan[state.currentExerciseIndex] ?? null;
   }, [state, exerciseKey]);
 
+  const plannedSetCount = exercise?.plannedSets ?? 1;
+
+  const loggedSetsForExercise = useMemo(() => {
+    if (!state || !exercise) return [];
+    return state.sets
+      .filter(
+        (set) =>
+          set.session_id === state.sessionId &&
+          set.exercise_id === exercise.exercise_id &&
+          set.is_deleted !== "TRUE"
+      )
+      .map((set) => ({ setNumber: set.set_number }));
+  }, [exercise, state]);
+
+  const activeSetNumber = useMemo(() => {
+    return computeNextSetNumber({
+      plannedSetCount,
+      loggedSetsForExercise,
+    });
+  }, [loggedSetsForExercise, plannedSetCount]);
+
   const draftKey = useMemo(() => {
     if (!exercise) return "";
-    const setNumber = state?.currentSetIndex ?? 1;
-    return `${exercise.exercise_id}-${setNumber}`;
-  }, [exercise, state?.currentSetIndex]);
+    return `${exercise.exercise_id}::${activeSetNumber}`;
+  }, [exercise, activeSetNumber]);
 
   const draftWeight = useMemo(() => {
     if (!state?.draftSets || !draftKey) return "";
     return state.draftSets[draftKey]?.weight ?? "";
   }, [draftKey, state?.draftSets]);
-
-  const setNumber = state?.currentSetIndex ?? 1;
 
   const defaultWeight = useMemo(() => {
     if (!exercise) return "";
@@ -81,9 +101,9 @@ export default function ReadyClient() {
     const sorted = [...usable].sort((a, b) =>
       b.set_timestamp.localeCompare(a.set_timestamp)
     );
-    const match = sorted.find((set) => set.set_number === setNumber);
+    const match = sorted.find((set) => set.set_number === activeSetNumber);
     return match?.weight ?? sorted[0]?.weight ?? "";
-  }, [draftWeight, exercise, history, loadingHistory, setNumber]);
+  }, [activeSetNumber, draftWeight, exercise, history, loadingHistory]);
 
   const [readyWeight, setReadyWeight] = useState("");
 
@@ -409,37 +429,28 @@ export default function ReadyClient() {
 
       {requiresWeight && (
         <section className="card stack">
-          <h3>Target weight</h3>
-          <div className="stack" style={{ alignItems: "center" }}>
-            <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1 }}>
-              {readyWeight ? readyWeight : "--"}
-            </div>
-            <input
-              className="input input--inline"
-              type="number"
-              inputMode="decimal"
-              value={readyWeight}
-              onChange={(event) => {
-                const next = event.target.value;
-                setReadyWeight(next);
-                updateState((prev) => {
-                  if (!prev) return prev;
-                  const currentDrafts = prev.draftSets ?? {};
-                  const current = currentDrafts[draftKey] ?? {};
-                  if ((current.weight ?? "") === next) return prev;
-                  return {
-                    ...prev,
-                    draftSets: {
-                      ...currentDrafts,
-                      [draftKey]: { ...current, weight: next },
-                    },
-                  };
-                });
-              }}
-              placeholder="lbs/kg"
-            />
-            <p className="muted">Set {setNumber}</p>
-          </div>
+          <InlineBigNumberInput
+            label="Weight to Load"
+            value={readyWeight}
+            onChange={(next) => {
+              setReadyWeight(next);
+              updateState((prev) => {
+                if (!prev) return prev;
+                const currentDrafts = prev.draftSets ?? {};
+                const current = currentDrafts[draftKey] ?? {};
+                if ((current.weight ?? "") === next) return prev;
+                return {
+                  ...prev,
+                  draftSets: {
+                    ...currentDrafts,
+                    [draftKey]: { ...current, weight: next },
+                  },
+                };
+              });
+            }}
+            className="items-center"
+          />
+          <p className="muted">Set {activeSetNumber}</p>
         </section>
       )}
 
