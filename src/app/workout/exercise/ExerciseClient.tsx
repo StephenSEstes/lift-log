@@ -25,16 +25,6 @@ type ExerciseSetupRow = {
   updatedAt: string;
 };
 
-type WindowWithWebkitAudioContext = Window & {
-  webkitAudioContext?: typeof AudioContext;
-};
-
-const formatElapsed = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
-
 const isValidDateValue = (value: string | null | undefined) => {
   if (!value) return false;
   return !Number.isNaN(Date.parse(value));
@@ -50,25 +40,6 @@ const normalizeRpe = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 5;
 };
 
-const playBeep = () => {
-  const AudioCtx =
-    window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
-  if (!AudioCtx) return;
-
-  const ctx = new AudioCtx();
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.value = 880;
-  gain.gain.value = 0.15;
-
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + 0.2);
-  oscillator.onended = () => ctx.close();
-};
 
 export default function ExerciseExecutionPage() {
   const router = useRouter();
@@ -91,18 +62,12 @@ export default function ExerciseExecutionPage() {
 
   const [requiresWeight, setRequiresWeight] = useState(true);
 
-  const [mode, setMode] = useState<"active" | "rest">("active");
-  const [restEndsAtMs, setRestEndsAtMs] = useState<number | null>(null);
-  const [restNextSetNumber, setRestNextSetNumber] = useState<number | null>(null);
-  const [restSeconds, setRestSeconds] = useState(0);
   const [restTargetSeconds, setRestTargetSeconds] = useState(60);
 
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editingSetNumber, setEditingSetNumber] = useState<number | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
-  const restStartRef = useRef<number | null>(null);
-  const restBeepedRef = useRef(false);
   const restTargetRef = useRef(60);
   const lastSavedSetIdRef = useRef<string | null>(null);
   const lastRestSecondsRef = useRef(0);
@@ -560,32 +525,6 @@ export default function ExerciseExecutionPage() {
     });
   }, [draftKey, editingSetId, exercise, reps, state, updateState]);
 
-  // Rest timer
-  useEffect(() => {
-    if (mode !== "rest" || !restEndsAtMs) return;
-
-    restBeepedRef.current = false;
-
-    const targetSeconds = restTargetRef.current ?? 60;
-    const tick = () => {
-      const remaining = Math.max(
-        Math.ceil((restEndsAtMs - Date.now()) / 1000),
-        0
-      );
-      setRestSeconds(remaining);
-
-      if (!restBeepedRef.current && remaining <= 0) {
-        restBeepedRef.current = true;
-        playBeep();
-      }
-    };
-
-    tick();
-    const id = window.setInterval(tick, 1000);
-
-    return () => window.clearInterval(id);
-  }, [mode, restEndsAtMs]);
-
   const resetInputs = () => {
     setWeight("");
     setReps("");
@@ -691,12 +630,14 @@ export default function ExerciseExecutionPage() {
         const nextSet = Math.min(totalSets, activeSetNumber + 1);
         setRestTargetSeconds(nextTarget);
         restTargetRef.current = nextTarget;
-        setRestNextSetNumber(nextSet);
-        setRestEndsAtMs(Date.now() + nextTarget * 1000);
-        restStartRef.current = Date.now();
-        setRestSeconds(nextTarget);
-        setMode("rest");
-        // Note: rest overlay replaces any dedicated rest route navigation (if previously used).
+        // Note: rest handling uses /workout/rest navigation; remove if rest flow changes.
+        router.push(
+          `/workout/rest?exerciseKey=${encodeURIComponent(
+            exercise.exercise_id
+          )}&sessionId=${encodeURIComponent(state.sessionId)}&nextSet=${encodeURIComponent(
+            String(nextSet)
+          )}&restTargetSec=${encodeURIComponent(String(nextTarget))}`
+        );
       } else {
         const nextExercise = state.plan[state.currentExerciseIndex + 1];
         if (nextExercise) {
@@ -817,12 +758,13 @@ export default function ExerciseExecutionPage() {
       const nextSet = Math.min(totalSets, activeSetNumber + 1);
       setRestTargetSeconds(resolved);
       restTargetRef.current = resolved;
-      setRestNextSetNumber(nextSet);
-      setRestEndsAtMs(Date.now() + resolved * 1000);
-      restStartRef.current = Date.now();
-      setRestSeconds(resolved);
-      setMode("rest");
-      // Note: rest overlay replaces any dedicated rest route navigation (if previously used).
+      router.push(
+        `/workout/rest?exerciseKey=${encodeURIComponent(
+          exercise.exercise_id
+        )}&sessionId=${encodeURIComponent(state.sessionId)}&nextSet=${encodeURIComponent(
+          String(nextSet)
+        )}&restTargetSec=${encodeURIComponent(String(resolved))}`
+      );
     } else {
       const nextExercise = state.plan[state.currentExerciseIndex + 1];
       if (nextExercise) {
@@ -833,66 +775,6 @@ export default function ExerciseExecutionPage() {
         );
       }
     }
-  };
-
-  const handleEndRest = async () => {
-    if (!state) return;
-
-    const startEpoch = restStartRef.current;
-    const duration = startEpoch ? Math.floor((Date.now() - startEpoch) / 1000) : 0;
-    lastRestSecondsRef.current = duration;
-
-    const target = restTargetSeconds;
-
-    // Update local last set rest values
-    updateState((prev) => {
-      if (!prev) return prev;
-
-      const nextSets = [...prev.sets];
-      const lastIndex = nextSets.length - 1;
-
-      if (lastIndex >= 0) {
-        const lastSet = nextSets[lastIndex];
-        nextSets[lastIndex] = {
-          ...lastSet,
-          rest_seconds: duration.toString(),
-          rest_target_seconds: target.toString(),
-        };
-      }
-
-      return { ...prev, sets: nextSets };
-    });
-
-    // Persist rest to Sheets for the last saved set (if present)
-    try {
-      if (lastSavedSetIdRef.current) {
-        await fetch("/api/sheets/sets/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            setId: lastSavedSetIdRef.current,
-            restSec: duration,
-            restTargetSec: target,
-          }),
-        });
-      } else {
-        console.warn("Missing lastSavedSetIdRef; skipping rest update.");
-      }
-    } catch (err) {
-      console.warn("Failed to update rest values in Sheets", err);
-    }
-
-  // Reset rest state
-  setMode("active");
-  setRestEndsAtMs(null);
-  setRestNextSetNumber(null);
-  setRestSeconds(0);
-  restStartRef.current = null;
-
-    // Clear selection state after rest
-    setEditingSetId(null);
-    setEditingSetNumber(null);
-    lastSavedSetIdRef.current = null;
   };
 
   const lastRpeValue = useMemo(() => {
@@ -1006,25 +888,12 @@ export default function ExerciseExecutionPage() {
 
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = activeSetNumber;
-  const overlaySetNumber = restNextSetNumber ?? activeSetNumber;
-  const overlayDraftKey = exercise ? `${exercise.exercise_id}::${overlaySetNumber}` : "";
-  const overlayWeightValue = useMemo(() => {
-    if (!exercise) return "";
-    const draftValue = state?.draftSets?.[overlayDraftKey]?.weight ?? "";
-    if (draftValue) return `${draftValue}`;
-    return pickSuggestedWeightForSet(overlaySetNumber);
-  }, [exercise, overlayDraftKey, overlaySetNumber, pickSuggestedWeightForSet, state?.draftSets]);
   return (
     <main className="page pb-24 md:pb-28">
       <header className="page__header">
         <button
           className="button button--ghost"
           onClick={() => {
-            if (mode === "rest") {
-              setMode("active");
-              setRestEndsAtMs(null);
-              setRestNextSetNumber(null);
-            }
             router.push(backHref);
           }}
         >
@@ -1042,54 +911,8 @@ export default function ExerciseExecutionPage() {
         {targetHelper && <p className="muted">{targetHelper}</p>}
       </header>
 
-      {mode === "rest" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <section className="card stack" style={{ maxWidth: 520, width: "100%" }}>
-            <span className="eyebrow">Rest</span>
-            <h2 className="title" style={{ fontSize: "2.4rem" }}>
-              Get ready for Set {overlaySetNumber}
-            </h2>
-            <div className="stack" style={{ alignItems: "center" }}>
-              <div style={{ fontSize: "4rem", fontWeight: 700, lineHeight: 1 }}>
-                {formatElapsed(restSeconds)}
-              </div>
-              <p className="muted">Remaining</p>
-            </div>
-          {requiresWeight && (
-            <InlineBigNumberInput
-              label="Load Weight to:"
-              value={overlayWeightValue}
-              onChange={(next) => {
-                if (!overlayDraftKey) return;
-                updateState((prev) => {
-                  if (!prev) return prev;
-                    const currentDrafts = prev.draftSets ?? {};
-                    const current = currentDrafts[overlayDraftKey] ?? {};
-                    if ((current.weight ?? "") === next) return prev;
-                    return {
-                      ...prev,
-                      draftSets: {
-                        ...currentDrafts,
-                        [overlayDraftKey]: { ...current, weight: next },
-                      },
-                    };
-                });
-              }}
-              className="items-center"
-              labelClassName="muted text-lg font-semibold"
-              inputClassName="text-3xl font-bold tabular-nums text-center"
-            />
-          )}
-            <button className="button button--accent" onClick={handleEndRest}>
-              Begin Next Set
-            </button>
-          </section>
-        </div>
-      )}
-
-      {mode === "active" && (
-        <section className="card stack">
-          <h3>Log this set</h3>
+      <section className="card stack">
+        <h3>Log this set</h3>
 
           {editingSetNumber && <p className="muted">Editing: Set {editingSetNumber}</p>}
 
@@ -1206,8 +1029,7 @@ export default function ExerciseExecutionPage() {
               placeholder="Equipment taken, pain, etc."
             />
           </div>
-        </section>
-      )}
+      </section>
 
       <section className="card fade-in">
         <div
