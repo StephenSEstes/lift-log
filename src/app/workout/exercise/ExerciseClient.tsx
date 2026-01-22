@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWorkoutSession } from "@/context/workout-session-context";
 import type { ExerciseCatalogRow, LoggedSet } from "@/lib/workout";
@@ -216,33 +216,6 @@ export default function ExerciseExecutionPage() {
     const first = recentSets.find((set) => set.is_skipped !== "TRUE");
     return first?.weight ?? "";
   }, [activeSetNumber, draftSet, recentSets]);
-
-  const pickSuggestedWeightForSet = useCallback(
-    (setNo: number): string => {
-      if (!exercise) return "";
-      const key = `${exercise.exercise_id}::${setNo}`;
-      const draft = state?.draftSets?.[key]?.weight;
-    if (draft !== undefined && draft !== null && `${draft}`.trim() !== "") {
-      return `${draft}`;
-    }
-
-    const sameSet = recentSets.find(
-      (set) =>
-        Number(set.set_number) === setNo &&
-        set.weight != null &&
-        `${set.weight}`.trim() !== ""
-    );
-    if (sameSet?.weight != null) return `${sameSet.weight}`;
-
-    const anySet = recentSets.find(
-      (set) => set.weight != null && `${set.weight}`.trim() !== ""
-    );
-    if (anySet?.weight != null) return `${anySet.weight}`;
-
-      return "";
-    },
-    [exercise, recentSets, state?.draftSets]
-  );
 
   useEffect(() => {
     if (!draftKey || editingSetId) return;
@@ -799,6 +772,35 @@ export default function ExerciseExecutionPage() {
   const setupNotes = exerciseSetup?.notes?.trim() ?? "";
   const showRequiresWeight = typeof exerciseSetup?.requiresWeight === "boolean";
 
+  const showDebug = (searchParams.get("debug") ?? "").trim() === "1";
+
+  const debugHistoryLine = useMemo(() => {
+    if (!showDebug) return "";
+    const count = recentSets.length;
+    if (!count) return "DEBUG history: count=0";
+    const first = recentSets[0] as Record<string, unknown>;
+    const keys = Object.keys(first ?? {});
+    const firstSetNumber =
+      typeof first?.set_number === "number" || typeof first?.set_number === "string"
+        ? String(first.set_number)
+        : "-";
+    const altSetNumber =
+      typeof first?.setNumber === "number" || typeof first?.setNumber === "string"
+        ? String(first.setNumber)
+        : "-";
+    const firstWeight =
+      typeof first?.weight === "number" || typeof first?.weight === "string"
+        ? String(first.weight)
+        : "-";
+    const firstReps =
+      typeof first?.reps === "number" || typeof first?.reps === "string"
+        ? String(first.reps)
+        : "-";
+    return `DEBUG history: count=${count} keys=${keys.join(
+      ","
+    )} firstSetNo=${firstSetNumber}/${altSetNumber} first=${firstWeight}x${firstReps}`;
+  }, [recentSets, showDebug]);
+
   if (!state) {
     return (
       <main className="page">
@@ -839,8 +841,6 @@ export default function ExerciseExecutionPage() {
   }
 
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
-  const showDebug = (searchParams.get("debug") ?? "").trim() === "1";
-
   const videoUrl = (catalogRow?.videoUrl || exercise.youtube_url || "").trim();
   const fallbackVideoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     `${displayName} form`
@@ -858,33 +858,6 @@ export default function ExerciseExecutionPage() {
     lastSessionDate && isValidDateValue(lastSessionDate)
       ? new Date(lastSessionDate).toLocaleDateString()
       : "";
-
-  const debugHistoryLine = useMemo(() => {
-    if (!showDebug) return "";
-    const count = recentSets.length;
-    if (!count) return "DEBUG history: count=0";
-    const first = recentSets[0] as Record<string, unknown>;
-    const keys = Object.keys(first ?? {});
-    const firstSetNumber =
-      typeof first?.set_number === "number" || typeof first?.set_number === "string"
-        ? String(first.set_number)
-        : "-";
-    const altSetNumber =
-      typeof first?.setNumber === "number" || typeof first?.setNumber === "string"
-        ? String(first.setNumber)
-        : "-";
-    const firstWeight =
-      typeof first?.weight === "number" || typeof first?.weight === "string"
-        ? String(first.weight)
-        : "-";
-    const firstReps =
-      typeof first?.reps === "number" || typeof first?.reps === "string"
-        ? String(first.reps)
-        : "-";
-    return `DEBUG history: count=${count} keys=${keys.join(
-      ","
-    )} firstSetNo=${firstSetNumber}/${altSetNumber} first=${firstWeight}x${firstReps}`;
-  }, [recentSets, showDebug]);
 
   const rpeDisplay = rpe.toFixed(1);
   const nextSetNumber = activeSetNumber;

@@ -20,7 +20,6 @@ type ExerciseSetupRow = {
 };
 
 type HistoryResponse = {
-  lastSessionDate: string | null;
   sets: LoggedSet[];
 };
 
@@ -36,7 +35,6 @@ export default function ReadyClient() {
   const [exerciseSetup, setExerciseSetup] = useState<ExerciseSetupRow | null>(null);
   const [catalogRow, setCatalogRow] = useState<ExerciseCatalogRow | null>(null);
   const [recentSets, setRecentSets] = useState<LoggedSet[]>([]);
-  const [lastSessionDate, setLastSessionDate] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [defaultRestSeconds, setDefaultRestSeconds] = useState("");
   const [setupNotes, setSetupNotes] = useState("");
@@ -173,16 +171,13 @@ export default function ReadyClient() {
         if (cancelled) return;
         if (!response.ok) {
           setRecentSets([]);
-          setLastSessionDate(null);
           return;
         }
         setRecentSets(data?.sets ?? []);
-        setLastSessionDate(data?.lastSessionDate ?? null);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === "AbortError") return;
         if (!cancelled) {
           setRecentSets([]);
-          setLastSessionDate(null);
         }
       } finally {
         if (!cancelled) setLoadingHistory(false);
