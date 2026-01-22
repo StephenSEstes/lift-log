@@ -55,10 +55,18 @@ export default function InlineBigNumberInput({
           ref={inputRef}
           id={inputId}
           className={cn(resolvedInputClassName, "w-[160px]")}
-          type="number"
+          type="text"
           inputMode="decimal"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
+          autoComplete="off"
+          spellCheck={false}
+          value={value ?? ""}
+          onChange={(event) => {
+            const raw = event.target.value;
+            const cleaned = raw
+              .replace(/[^\d.]/g, "")
+              .replace(/^(\d*\.\d*).*$/, "$1");
+            onChange(cleaned);
+          }}
           onBlur={() => setIsEditing(false)}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === "Escape") {
