@@ -364,6 +364,16 @@ export default function ExerciseExecutionPage() {
     suggestedWeight,
   ]);
 
+  useEffect(() => {
+    if (!requiresWeight) return;
+    if (editingSetId) return;
+    if (loadingHistory) return;
+    if (weight && weight.trim() !== "") return;
+    if (suggestedWeight && suggestedWeight.trim() !== "") {
+      setWeight(suggestedWeight);
+    }
+  }, [requiresWeight, editingSetId, loadingHistory, suggestedWeight, weight]);
+
   // Guard routing when state/exercise missing
   useEffect(() => {
     if (!state) return;
@@ -1045,14 +1055,14 @@ export default function ExerciseExecutionPage() {
               </div>
               <p className="muted">Remaining</p>
             </div>
-            {requiresWeight && (
-              <InlineBigNumberInput
-                label="Weight to Load"
-                value={overlayWeightValue}
-                onChange={(next) => {
-                  if (!overlayDraftKey) return;
-                  updateState((prev) => {
-                    if (!prev) return prev;
+          {requiresWeight && (
+            <InlineBigNumberInput
+              label="Load Weight to:"
+              value={overlayWeightValue}
+              onChange={(next) => {
+                if (!overlayDraftKey) return;
+                updateState((prev) => {
+                  if (!prev) return prev;
                     const currentDrafts = prev.draftSets ?? {};
                     const current = currentDrafts[overlayDraftKey] ?? {};
                     if ((current.weight ?? "") === next) return prev;
@@ -1063,11 +1073,13 @@ export default function ExerciseExecutionPage() {
                         [overlayDraftKey]: { ...current, weight: next },
                       },
                     };
-                  });
-                }}
-                className="items-center"
-              />
-            )}
+                });
+              }}
+              className="items-center"
+              labelClassName="muted text-lg font-semibold"
+              inputClassName="text-3xl font-bold tabular-nums text-center"
+            />
+          )}
             <button className="button button--accent" onClick={handleEndRest}>
               Begin Next Set
             </button>
@@ -1083,9 +1095,11 @@ export default function ExerciseExecutionPage() {
 
           {requiresWeight && (
             <InlineBigNumberInput
-              label="Weight to Load"
+              label="Load Weight to:"
               value={weight}
               onChange={setWeight}
+              labelClassName="muted text-lg font-semibold"
+              inputClassName="text-3xl font-bold tabular-nums text-center"
             />
           )}
 

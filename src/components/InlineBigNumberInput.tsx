@@ -8,6 +8,8 @@ type InlineBigNumberInputProps = {
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  labelClassName?: string;
+  inputClassName?: string;
 };
 
 export default function InlineBigNumberInput({
@@ -16,6 +18,8 @@ export default function InlineBigNumberInput({
   onChange,
   disabled = false,
   className,
+  labelClassName,
+  inputClassName,
 }: InlineBigNumberInputProps) {
   const inputId = useId();
   const [isEditing, setIsEditing] = useState(false);
@@ -31,17 +35,19 @@ export default function InlineBigNumberInput({
   const containerClassName = className
     ? `stack ${className}`
     : "stack items-center";
+  const resolvedLabelClassName = labelClassName ?? "text-sm font-medium";
+  const resolvedInputClassName = inputClassName ?? "text-5xl font-semibold text-center";
 
   return (
     <div className={containerClassName}>
-      <label className="text-sm font-medium" htmlFor={inputId}>
+      <label className={resolvedLabelClassName} htmlFor={inputId}>
         {label}
       </label>
       {isEditing && !disabled ? (
         <input
           ref={inputRef}
           id={inputId}
-          className="input text-5xl font-semibold text-center w-[160px]"
+          className={`input ${resolvedInputClassName} w-[160px]`}
           type="number"
           inputMode="decimal"
           value={value}
@@ -57,7 +63,7 @@ export default function InlineBigNumberInput({
       ) : (
         <button
           type="button"
-          className="min-w-[140px] rounded-2xl border border-[var(--edge)] bg-white/70 px-4 py-2 text-5xl font-semibold text-center"
+          className={`min-w-[140px] rounded-2xl border border-[var(--edge)] bg-white/70 px-4 py-2 ${resolvedInputClassName}`}
           onClick={() => {
             if (!disabled) setIsEditing(true);
           }}
