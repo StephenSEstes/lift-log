@@ -2,6 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+const cn = (...values: Array<string | undefined>) =>
+  values.filter(Boolean).join(" ");
+
 type InlineBigNumberInputProps = {
   label: string;
   value: string;
@@ -35,8 +38,12 @@ export default function InlineBigNumberInput({
   const containerClassName = className
     ? `stack ${className}`
     : "stack items-center";
-  const resolvedLabelClassName = labelClassName ?? "text-sm font-medium";
-  const resolvedInputClassName = inputClassName ?? "text-5xl font-semibold text-center";
+  const resolvedLabelClassName = cn("text-lg font-semibold", labelClassName);
+  const resolvedInputClassName = cn(
+    "input",
+    "text-3xl font-bold tabular-nums text-center",
+    inputClassName
+  );
 
   return (
     <div className={containerClassName}>
@@ -47,7 +54,7 @@ export default function InlineBigNumberInput({
         <input
           ref={inputRef}
           id={inputId}
-          className={`input ${resolvedInputClassName} w-[160px]`}
+          className={cn(resolvedInputClassName, "w-[160px]")}
           type="number"
           inputMode="decimal"
           value={value}
@@ -63,7 +70,10 @@ export default function InlineBigNumberInput({
       ) : (
         <button
           type="button"
-          className={`min-w-[140px] rounded-2xl border border-[var(--edge)] bg-white/70 px-4 py-2 ${resolvedInputClassName}`}
+          className={cn(
+            "min-w-[140px] rounded-2xl border border-[var(--edge)] bg-white/70 px-4 py-2",
+            resolvedInputClassName
+          )}
           onClick={() => {
             if (!disabled) setIsEditing(true);
           }}
