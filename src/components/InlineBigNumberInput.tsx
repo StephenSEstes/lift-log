@@ -26,13 +26,15 @@ export default function InlineBigNumberInput({
 }: InlineBigNumberInputProps) {
   const inputId = useId();
   const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (isEditing) {
+      setDraft(value ?? "");
       inputRef.current?.focus();
     }
-  }, [isEditing]);
+  }, [isEditing, value]);
 
   const displayValue = value && value.trim() ? value : "Tap to set";
   const containerClassName = className
@@ -59,13 +61,17 @@ export default function InlineBigNumberInput({
           inputMode="decimal"
           autoComplete="off"
           spellCheck={false}
-          value={value ?? ""}
+          value={draft}
           onChange={(event) => {
             const raw = event.target.value;
             const cleaned = raw
               .replace(/[^\d.]/g, "")
               .replace(/^(\d*\.\d*).*$/, "$1");
-            onChange(cleaned);
+            const parts = cleaned.split(".");
+            const normalized =
+              parts.length <= 1 ? parts[0] : `${parts[0]}.${parts.slice(1).join("")}`;
+            setDraft(normalized);
+            onChange(normalized);
           }}
           onBlur={() => setIsEditing(false)}
           onKeyDown={(event) => {
