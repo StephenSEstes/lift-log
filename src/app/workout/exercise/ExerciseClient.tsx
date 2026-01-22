@@ -947,6 +947,7 @@ export default function ExerciseExecutionPage() {
   }
 
   const displayName = catalogRow?.exerciseName || exercise.exercise_name;
+  const showDebug = (searchParams.get("debug") ?? "").trim() === "1";
 
   const videoUrl = (catalogRow?.videoUrl || exercise.youtube_url || "").trim();
   const fallbackVideoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
@@ -966,15 +967,31 @@ export default function ExerciseExecutionPage() {
       ? new Date(lastSessionDate).toLocaleDateString()
       : "";
 
-  const showDebug = (searchParams.get("debug") ?? "").trim() === "1";
   const debugHistoryLine = useMemo(() => {
     if (!showDebug) return "";
-    const first = recentSets[0];
-    const firstSetNumber = first ? Number(first.set_number || 0) : 0;
-    const firstWeight = first?.weight ?? "-";
-    return `History: ${recentSets.length} sets (first: set ${
-      firstSetNumber || "-"
-    } @ ${firstWeight || "-"})`;
+    const count = recentSets.length;
+    if (!count) return "DEBUG history: count=0";
+    const first = recentSets[0] as Record<string, unknown>;
+    const keys = Object.keys(first ?? {});
+    const firstSetNumber =
+      typeof first?.set_number === "number" || typeof first?.set_number === "string"
+        ? String(first.set_number)
+        : "-";
+    const altSetNumber =
+      typeof first?.setNumber === "number" || typeof first?.setNumber === "string"
+        ? String(first.setNumber)
+        : "-";
+    const firstWeight =
+      typeof first?.weight === "number" || typeof first?.weight === "string"
+        ? String(first.weight)
+        : "-";
+    const firstReps =
+      typeof first?.reps === "number" || typeof first?.reps === "string"
+        ? String(first.reps)
+        : "-";
+    return `DEBUG history: count=${count} keys=${keys.join(
+      ","
+    )} firstSetNo=${firstSetNumber}/${altSetNumber} first=${firstWeight}x${firstReps}`;
   }, [recentSets, showDebug]);
 
   const rpeDisplay = rpe.toFixed(1);
@@ -1005,6 +1022,9 @@ export default function ExerciseExecutionPage() {
         </button>
         <span className="eyebrow">Exercise</span>
         <h1 className="title">{displayName}</h1>
+        {showDebug && (
+          <p className="muted">DEBUG: ExerciseClient marker = EXECLIENT_2026-01-21_A</p>
+        )}
         <p className="subtitle">
           Set {displaySetNumber} of {totalSets}
         </p>
